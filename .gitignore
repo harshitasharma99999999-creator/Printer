@@ -1,5 +1,7 @@
 __pycache__
 config.json
+token.json
+client_secrets.json
 .mp/
 venv/
 Songs/

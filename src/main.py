@@ -1,3 +1,4 @@
+import time
 import schedule
 import subprocess
 
@@ -15,6 +16,8 @@ from classes.YouTube import YouTube
 from prettytable import PrettyTable
 from classes.Outreach import Outreach
 from classes.AFM import AffiliateMarketing
+from classes.EBook import EBook
+from classes.LongForm import LongForm, LONG_FORM_NICHES
 from llm_provider import list_models, select_model, get_active_model
 
 def main():
@@ -207,13 +210,116 @@ def main():
                             schedule.every().day.at("10:00").do(job)
                             schedule.every().day.at("16:00").do(job)
                             success("Set up CRON Job.")
+                        elif user_input == 3:
+                            # Upload Thrice a day
+                            schedule.every().day.at("08:00").do(job)
+                            schedule.every().day.at("14:00").do(job)
+                            schedule.every().day.at("20:00").do(job)
+                            success("Set up CRON Job.")
                         else:
+                            break
+
+                        if user_input in [1, 2, 3]:
+                            info("CRON Job is running. Press Ctrl+C to stop.", False)
+                            try:
+                                while True:
+                                    schedule.run_pending()
+                                    time.sleep(60)
+                            except KeyboardInterrupt:
+                                info("CRON Job stopped.")
                             break
                     elif user_input == 4:
                         if get_verbose():
                             info(" => Climbing Options Ladder...", False)
                         break
     elif user_input == 2:
+        info("Starting Long-Form YouTube Video Generator...")
+
+        cached_accounts = get_accounts("youtube")
+        if len(cached_accounts) == 0:
+            warning("No YouTube accounts found. Add one via YouTube Shorts menu first.")
+        else:
+            # Account selection
+            table = PrettyTable()
+            table.field_names = ["#", "Nickname", "Niche"]
+            for i, acc in enumerate(cached_accounts, 1):
+                table.add_row([i, acc["nickname"], acc.get("niche", "")])
+            print(table)
+            acc_idx = int(question("Select account number: ")) - 1
+            selected_account = cached_accounts[acc_idx]
+
+            # Niche selection
+            info("\n==== LONG-FORM NICHES ====", False)
+            for i, n in enumerate(LONG_FORM_NICHES, 1):
+                print(colored(f" {i}. {n}", "cyan"))
+            info("==========================\n", False)
+            niche_idx = int(question("Select niche: ")) - 1
+            niche = LONG_FORM_NICHES[niche_idx] if 0 <= niche_idx < len(LONG_FORM_NICHES) else selected_account["niche"]
+
+            while True:
+                info("\n====== LONG-FORM OPTIONS ======", False)
+                for i, opt in enumerate(LONGFORM_OPTIONS, 1):
+                    print(colored(f" {i}. {opt}", "cyan"))
+                info("===============================\n", False)
+                lf_input = int(question("Select an option: "))
+
+                if lf_input == 1:
+                    lf = LongForm(
+                        selected_account["id"],
+                        selected_account["nickname"],
+                        selected_account["firefox_profile"],
+                        niche,
+                        selected_account.get("language", "English"),
+                    )
+                    result = lf.run()
+                    success(f"Long-form video complete: {result.get('url', 'uploaded')}")
+
+                elif lf_input == 2:
+                    videos = get_accounts("youtube")
+                    info("Check studio.youtube.com for your uploaded long-form videos.")
+
+                elif lf_input == 3:
+                    info("\n==== LONG-FORM CRON OPTIONS ====", False)
+                    for i, opt in enumerate(LONGFORM_CRON_OPTIONS, 1):
+                        print(colored(f" {i}. {opt}", "cyan"))
+                    info("================================\n", False)
+                    cron_choice = int(question("Select frequency: "))
+
+                    def run_lf_cron():
+                        try:
+                            _lf = LongForm(
+                                selected_account["id"],
+                                selected_account["nickname"],
+                                selected_account["firefox_profile"],
+                                niche,
+                                selected_account.get("language", "English"),
+                            )
+                            _lf.run()
+                        except Exception as _e:
+                            error(f"Long-form CRON error: {_e}")
+
+                    if cron_choice == 1:
+                        schedule.every().day.at("11:00").do(run_lf_cron)
+                        success("Long-form CRON: daily at 11:00 AM")
+                    elif cron_choice == 2:
+                        schedule.every().day.at("10:00").do(run_lf_cron)
+                        schedule.every().day.at("17:00").do(run_lf_cron)
+                        success("Long-form CRON: 10:00 AM and 05:00 PM")
+                    else:
+                        break
+
+                    info("CRON running... Press Ctrl+C to stop.")
+                    try:
+                        while True:
+                            schedule.run_pending()
+                            time.sleep(60)
+                    except KeyboardInterrupt:
+                        info("CRON stopped.")
+
+                elif lf_input == 4:
+                    break
+
+    elif user_input == 3:
         info("Starting Twitter Bot...")
 
         cached_accounts = get_accounts("twitter")
@@ -350,7 +456,7 @@ def main():
                         if get_verbose():
                             info(" => Climbing Options Ladder...", False)
                         break
-    elif user_input == 3:
+    elif user_input == 4:
         info("Starting Affiliate Marketing...")
 
         cached_products = get_products()
@@ -406,18 +512,156 @@ def main():
                     if acc["id"] == selected_product["twitter_uuid"]:
                         account = acc
 
-                afm = AffiliateMarketing(selected_product["affiliate_link"], account["firefox_profile"], account["id"], account["nickname"], account["topic"])
+                # Scrape product info (no browser needed)
+                afm = AffiliateMarketing(selected_product["affiliate_link"])
+                success(f"Found product: {afm.product_title}")
 
-                afm.generate_pitch()
-                afm.share_pitch("twitter")
+                # Create a YouTube Short about this specific product
+                yt_accounts = get_accounts("youtube")
+                if not yt_accounts:
+                    error("No YouTube accounts found. Add one via the YouTube Shorts menu first.")
+                else:
+                    yt_account = yt_accounts[0]
+                    tts = TTS()
+                    youtube = YouTube(
+                        yt_account["id"],
+                        yt_account["nickname"],
+                        yt_account["firefox_profile"],
+                        yt_account["niche"],
+                        yt_account["language"]
+                    )
+                    youtube.set_subject(f"{afm.product_title}")
+                    youtube.generate_video(tts)
+                    youtube.upload_video()
 
-    elif user_input == 4:
+                setup_cron = question("Set up automatic product Shorts? (Yes/No): ")
+                if setup_cron.lower() == "yes":
+                    info("\n============ OPTIONS ============", False)
+                    print(colored(" 1. Once a day", "cyan"))
+                    print(colored(" 2. Twice a day", "cyan"))
+                    print(colored(" 3. Thrice a day", "cyan"))
+                    info("=================================\n", False)
+                    cron_choice = int(question("Select an Option: "))
+
+                    afm_cron_script = os.path.join(ROOT_DIR, "src", "cron.py")
+                    afm_command = ["python", afm_cron_script, "afm", selected_product["id"], get_active_model()]
+
+                    def afm_job():
+                        subprocess.run(afm_command)
+
+                    if cron_choice == 1:
+                        schedule.every(1).day.do(afm_job)
+                    elif cron_choice == 2:
+                        schedule.every().day.at("10:00").do(afm_job)
+                        schedule.every().day.at("18:00").do(afm_job)
+                    else:
+                        schedule.every().day.at("08:00").do(afm_job)
+                        schedule.every().day.at("13:00").do(afm_job)
+                        schedule.every().day.at("19:00").do(afm_job)
+
+                    success("Set up AFM CRON Job.")
+                    info("Auto-posting is running. Press Ctrl+C to stop.", False)
+                    try:
+                        while True:
+                            schedule.run_pending()
+                            time.sleep(60)
+                    except KeyboardInterrupt:
+                        info("CRON stopped.")
+
+    elif user_input == 5:
         info("Starting Outreach...")
 
         outreach = Outreach()
 
         outreach.start()
-    elif user_input == 5:
+    elif user_input == 6:
+        # eBook Generator
+        valid_ebook_input = False
+        while not valid_ebook_input:
+            try:
+                info("\n======= eBOOK GENERATOR =======", False)
+                for idx, option in enumerate(EBOOK_OPTIONS):
+                    print(colored(f" {idx + 1}. {option}", "cyan"))
+                info("================================\n", False)
+                ebook_input = int(input("Select an option: ").strip())
+                valid_ebook_input = True
+            except ValueError:
+                error("Please enter a number.")
+                continue
+
+            if ebook_input == 1:
+                ebook = EBook()
+                result = ebook.run()
+                add_published_ebook(result)
+                success(f"eBook saved to cache. PDF: {result['pdf_path']}")
+                if result.get("gumroad_url"):
+                    success(f"Live on Gumroad: {result['gumroad_url']}")
+
+            elif ebook_input == 2:
+                ebooks = get_published_ebooks()
+                if not ebooks:
+                    info("No eBooks published yet.")
+                else:
+                    table = PrettyTable()
+                    table.field_names = ["#", "Title", "Topic", "Price", "Gumroad URL", "Published At"]
+                    for i, eb in enumerate(ebooks, 1):
+                        table.add_row([
+                            i,
+                            eb.get("title", "")[:40],
+                            eb.get("topic", "")[:30],
+                            f"${eb.get('price', 0):.2f}",
+                            eb.get("gumroad_url", "N/A")[:40],
+                            eb.get("published_at", "")[:19],
+                        ])
+                    print(table)
+
+            elif ebook_input == 3:
+                # CRON setup
+                info("\n==== eBOOK CRON OPTIONS ====", False)
+                for idx, opt in enumerate(EBOOK_CRON_OPTIONS):
+                    print(colored(f" {idx + 1}. {opt}", "cyan"))
+                info("============================\n", False)
+                try:
+                    cron_choice = int(input("Select frequency: ").strip())
+                except ValueError:
+                    cron_choice = 0
+
+                def run_ebook_cron():
+                    try:
+                        eb = EBook()
+                        res = eb.run()
+                        add_published_ebook(res)
+                        success(f"CRON: eBook published — {res['title']}")
+                    except Exception as e:
+                        error(f"CRON eBook error: {e}")
+
+                if cron_choice == 1:
+                    schedule.every().day.at("10:00").do(run_ebook_cron)
+                    success("eBook CRON scheduled: daily at 10:00 AM")
+                elif cron_choice == 2:
+                    schedule.every().day.at("09:00").do(run_ebook_cron)
+                    schedule.every().day.at("18:00").do(run_ebook_cron)
+                    success("eBook CRON scheduled: 09:00 AM and 06:00 PM")
+                elif cron_choice == 3:
+                    info("CRON not set.")
+                else:
+                    error("Invalid option.")
+
+                if cron_choice in [1, 2]:
+                    info("CRON running... Press Ctrl+C to stop.")
+                    try:
+                        while True:
+                            schedule.run_pending()
+                            time.sleep(60)
+                    except KeyboardInterrupt:
+                        info("CRON stopped.")
+
+            elif ebook_input == 4:
+                break
+            else:
+                error("Invalid option.")
+
+    elif user_input == 7:
         if get_verbose():
             print(colored(" => Quitting...", "blue"))
         sys.exit(0)

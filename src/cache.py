@@ -191,3 +191,20 @@ def get_results_cache_path() -> str:
         path (str): The path to the results cache folder
     """
     return os.path.join(get_cache_path(), 'scraper_results.csv')
+
+def get_ebook_cache_path() -> str:
+    return os.path.join(get_cache_path(), 'ebooks.json')
+
+def get_published_ebooks() -> List[dict]:
+    if not os.path.exists(get_ebook_cache_path()):
+        with open(get_ebook_cache_path(), 'w') as file:
+            json.dump({"ebooks": []}, file, indent=4)
+    with open(get_ebook_cache_path(), 'r') as file:
+        parsed = json.load(file)
+        return parsed.get("ebooks", [])
+
+def add_published_ebook(ebook: dict) -> None:
+    ebooks = get_published_ebooks()
+    ebooks.append(ebook)
+    with open(get_ebook_cache_path(), 'w') as file:
+        json.dump({"ebooks": ebooks}, file, indent=4)

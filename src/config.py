@@ -89,6 +89,14 @@ def get_ollama_model() -> str:
     with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
         return json.load(file).get("ollama_model", "")
 
+def get_groq_api_key() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("groq_api_key", "")
+
+def get_groq_model() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("groq_model", "llama-3.3-70b-versatile")
+
 def get_twitter_language() -> str:
     """
     Gets the Twitter language from the config file.
@@ -325,6 +333,11 @@ def get_imagemagick_path() -> str:
     with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
         return json.load(file)["imagemagick_path"]
 
+def get_affiliate_link() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("affiliate_link", "")
+
+
 def get_script_sentence_length() -> int:
     """
     Gets the forced script's sentence length.
@@ -339,3 +352,37 @@ def get_script_sentence_length() -> int:
             return config_json["script_sentence_length"]
         else:
             return 4
+
+def get_gumroad_access_token() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("gumroad_access_token", "")
+
+def get_ebook_price() -> float:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return float(json.load(file).get("ebook_price", 4.99))
+
+def get_ebook_author() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("ebook_author", "Anonymous")
+
+def get_kdp_firefox_profile() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        cfg = json.load(file)
+        return cfg.get("kdp_firefox_profile", cfg.get("firefox_profile", ""))
+
+def get_gumroad_firefox_profile() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        cfg = json.load(file)
+        return cfg.get("gumroad_firefox_profile", cfg.get("firefox_profile", ""))
+
+def get_kdp_affiliate_link() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("kdp_affiliate_link", "")
+
+def get_kdp_email() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("kdp_email", "")
+
+def get_kdp_password() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("kdp_password", "")

@@ -24,6 +24,9 @@ from moviepy.config import change_settings
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from moviepy.video.tools.subtitles import SubtitlesClip
 from webdriver_manager.firefox import GeckoDriverManager
 from datetime import datetime
@@ -91,6 +94,10 @@ class YouTube:
         self.options.add_argument("-profile")
         self.options.add_argument(self._fp_profile_path)
 
+        # Kill any lingering Firefox processes before starting a new session
+        close_running_selenium_instances()
+        time.sleep(2)
+
         # Set the service
         self.service: Service = Service(GeckoDriverManager().install())
 
@@ -98,6 +105,10 @@ class YouTube:
         self.browser: webdriver.Firefox = webdriver.Firefox(
             service=self.service, options=self.options
         )
+
+    def set_subject(self, subject: str) -> None:
+        """Override topic generation with a specific subject (e.g. product name)."""
+        self.subject = subject
 
     @property
     def niche(self) -> str:
@@ -158,26 +169,26 @@ class YouTube:
         """
         sentence_length = get_script_sentence_length()
         prompt = f"""
-        Generate a script for a video in {sentence_length} sentences, depending on the subject of the video.
+        You are a warm, calming life coach creating a short guided video script.
+        Write a script of exactly {sentence_length} sentences about the subject below.
 
-        The script is to be returned as a string with the specified number of paragraphs.
+        The tone must be:
+        - Warm, personal, and human — speak directly to the viewer as "you"
+        - Slow-paced and calming, like a guided meditation or coaching session
+        - Include one gentle interactive instruction the viewer can do right now, such as:
+          "Close your eyes and take a deep breath", "Place your hand on your heart",
+          "Repeat after me", "Take a moment to imagine", "Breathe in slowly"
+        - End with an uplifting, empowering statement
 
-        Here is an example of a string:
-        "This is an example string."
+        Rules:
+        - Exactly {sentence_length} sentences, each sentence easy to speak aloud slowly
+        - NO markdown, NO titles, NO bullet points, NO headers
+        - NO meta-commentary about the script itself
+        - NO "welcome" or "in this video" openings
+        - Write only the raw spoken words, nothing else
+        - Language: {self.language}
 
-        Do not under any circumstance reference this prompt in your response.
-
-        Get straight to the point, don't start with unnecessary things like, "welcome to this video".
-
-        Obviously, the script should be related to the subject of the video.
-        
-        YOU MUST NOT EXCEED THE {sentence_length} SENTENCES LIMIT. MAKE SURE THE {sentence_length} SENTENCES ARE SHORT.
-        YOU MUST NOT INCLUDE ANY TYPE OF MARKDOWN OR FORMATTING IN THE SCRIPT, NEVER USE A TITLE.
-        YOU MUST WRITE THE SCRIPT IN THE LANGUAGE SPECIFIED IN [LANGUAGE].
-        ONLY RETURN THE RAW CONTENT OF THE SCRIPT. DO NOT INCLUDE "VOICEOVER", "NARRATOR" OR SIMILAR INDICATORS OF WHAT SHOULD BE SPOKEN AT THE BEGINNING OF EACH PARAGRAPH OR LINE. YOU MUST NOT MENTION THE PROMPT, OR ANYTHING ABOUT THE SCRIPT ITSELF. ALSO, NEVER TALK ABOUT THE AMOUNT OF PARAGRAPHS OR LINES. JUST WRITE THE SCRIPT
-        
         Subject: {self.subject}
-        Language: {self.language}
         """
         completion = self.generate_response(prompt)
 
@@ -216,6 +227,14 @@ class YouTube:
         description = self.generate_response(
             f"Please generate a YouTube Video Description for the following script: {self.script}. Only return the description, nothing else."
         )
+
+        affiliate_link = get_affiliate_link()
+        if affiliate_link:
+            description += f"\n\n🛒 Recommended products for your journey:\n{affiliate_link}"
+
+        # #Shorts tag is required for YouTube to classify vertical videos as Shorts
+        if "#Shorts" not in description and "#shorts" not in description:
+            description += "\n\n#Shorts #Short"
 
         self.metadata = {"title": title, "description": description}
 
@@ -377,9 +396,23 @@ class YouTube:
                 warning(f"Failed to generate image with Nano Banana 2 API: {str(e)}")
             return None
 
+    def generate_image_free(self, prompt: str) -> str:
+        import hashlib
+        print(f"Generating Image using Picsum (free): {prompt}")
+        seed = hashlib.md5(prompt.encode()).hexdigest()[:8]
+        url = f"https://picsum.photos/seed/{seed}/1080/1920"
+        try:
+            response = requests.get(url, timeout=30, allow_redirects=True)
+            response.raise_for_status()
+            return self._persist_image(response.content, "Picsum")
+        except Exception as e:
+            if get_verbose():
+                warning(f"Failed to generate image with Picsum: {str(e)}")
+            return None
+
     def generate_image(self, prompt: str) -> str:
         """
-        Generates an AI Image based on the given prompt using Nano Banana 2.
+        Generates an AI Image based on the given prompt using Picsum (free, no API key).
 
         Args:
             prompt (str): Reference for image generation
@@ -387,7 +420,7 @@ class YouTube:
         Returns:
             path (str): The path to the generated image.
         """
-        return self.generate_image_nanobanana2(prompt)
+        return self.generate_image_free(prompt)
 
     def generate_script_to_speech(self, tts_instance: TTS) -> str:
         """
@@ -656,8 +689,9 @@ class YouTube:
         Returns:
             path (str): The path to the generated MP4 File.
         """
-        # Generate the Topic
-        self.generate_topic()
+        # Generate the Topic (skip if subject already set via set_subject())
+        if not hasattr(self, 'subject') or not self.subject:
+            self.generate_topic()
 
         # Generate the Script
         self.generate_script()
@@ -717,16 +751,17 @@ class YouTube:
             driver.get("https://www.youtube.com/upload")
 
             # Set video file
-            FILE_PICKER_TAG = "ytcp-uploads-file-picker"
-            file_picker = driver.find_element(By.TAG_NAME, FILE_PICKER_TAG)
-            INPUT_TAG = "input"
-            file_input = file_picker.find_element(By.TAG_NAME, INPUT_TAG)
+            file_picker = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.TAG_NAME, "ytcp-uploads-file-picker"))
+            )
+            file_input = file_picker.find_element(By.TAG_NAME, "input")
             file_input.send_keys(self.video_path)
 
-            # Wait for upload to finish
+            # Wait for upload dialog to fully load (title + description boxes)
             time.sleep(5)
-
-            # Set title
+            WebDriverWait(driver, 30).until(
+                lambda d: len(d.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)) >= 2
+            )
             textboxes = driver.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)
 
             title_el = textboxes[0]
@@ -737,7 +772,8 @@ class YouTube:
 
             title_el.click()
             time.sleep(1)
-            title_el.clear()
+            title_el.send_keys(Keys.CONTROL + "a")
+            title_el.send_keys(Keys.DELETE)
             title_el.send_keys(self.metadata["title"])
 
             if verbose:
@@ -747,7 +783,8 @@ class YouTube:
             time.sleep(10)
             description_el.click()
             time.sleep(0.5)
-            description_el.clear()
+            description_el.send_keys(Keys.CONTROL + "a")
+            description_el.send_keys(Keys.DELETE)
             description_el.send_keys(self.metadata["description"])
 
             time.sleep(0.5)
@@ -770,34 +807,32 @@ class YouTube:
 
             time.sleep(0.5)
 
-            # Click next
+            # Click Next x3 (with WebDriverWait for reliability)
             if verbose:
-                info("\t=> Clicking next...")
+                info("\t=> Clicking next (3x)...")
+            for _ in range(3):
+                next_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, YOUTUBE_NEXT_BUTTON_ID))
+                )
+                next_button.click()
+                time.sleep(2)
 
-            next_button = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
-            next_button.click()
-
-            # Click next again
+            # Set as Public
             if verbose:
-                info("\t=> Clicking next again...")
-            next_button = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
-            next_button.click()
+                info("\t=> Setting as public...")
 
-            # Wait for 2 seconds
-            time.sleep(2)
-
-            # Click next again
-            if verbose:
-                info("\t=> Clicking next again...")
-            next_button = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
-            next_button.click()
-
-            # Set as unlisted
-            if verbose:
-                info("\t=> Setting as unlisted...")
-
-            radio_button = driver.find_elements(By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH)
-            radio_button[2].click()
+            try:
+                public_radio = WebDriverWait(driver, 15).until(
+                    EC.element_to_be_clickable((By.XPATH, "//*[@name='PUBLIC']"))
+                )
+                public_radio.click()
+            except Exception:
+                # Fallback: find by text label
+                time.sleep(3)
+                for btn in driver.find_elements(By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH):
+                    if "Public" in btn.text and "Unlisted" not in btn.text:
+                        btn.click()
+                        break
 
             if verbose:
                 info("\t=> Clicking done button...")
@@ -848,8 +883,14 @@ class YouTube:
             driver.quit()
 
             return True
-        except:
-            self.browser.quit()
+        except Exception as e:
+            print(f"[Upload Error] {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                self.browser.quit()
+            except:
+                pass
             return False
 
     def get_videos(self) -> List[dict]:

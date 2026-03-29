@@ -16,3 +16,12 @@ faster-whisper
 srt_equalizer
 undetected_chromedriver
 platformdirs
+requests
+beautifulsoup4
+pytrends
+reportlab
+ebooklib
+groq
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib

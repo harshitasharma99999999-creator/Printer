@@ -7,9 +7,38 @@ TWITTER_POST_BUTTON_XPATH = "/html/body/div[1]/div/div/div[2]/main/div/div/div/d
 
 OPTIONS = [
     "YouTube Shorts Automation",
+    "Long-Form YouTube Videos",
     "Twitter Bot",
     "Affiliate Marketing",
     "Outreach",
+    "eBook Generator",
+    "Quit"
+]
+# 1=Shorts, 2=LongForm, 3=Twitter, 4=AFM, 5=Outreach, 6=eBook, 7=Quit
+
+LONGFORM_OPTIONS = [
+    "Generate & Upload Long-Form Video",
+    "Show Uploaded Videos",
+    "Setup CRON Job",
+    "Quit"
+]
+
+LONGFORM_CRON_OPTIONS = [
+    "Once a day",
+    "Twice a day",
+    "Quit"
+]
+
+EBOOK_OPTIONS = [
+    "Generate & Publish eBook",
+    "Show Published eBooks",
+    "Setup CRON Job",
+    "Quit"
+]
+
+EBOOK_CRON_OPTIONS = [
+    "Once a day",
+    "Twice a day",
     "Quit"
 ]
 
