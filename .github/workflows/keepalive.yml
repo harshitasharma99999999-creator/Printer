@@ -1,0 +1,20 @@
+name: Keepalive
+
+on:
+  schedule:
+    - cron: "0 0 */50 * *"   # every 50 days
+  workflow_dispatch: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Keep workflows active
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          time_elapsed: 50
