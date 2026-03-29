@@ -200,75 +200,67 @@ class YouTube:
 
         return self.metadata
 
-    def generate_prompts(self) -> List[str]:
+    def generate_prompts(self, _retries: int = 0) -> List[str]:
         """
         Generates AI Image Prompts based on the provided Video Script.
 
         Returns:
             image_prompts (List[str]): Generated List of image prompts.
         """
-        n_prompts = len(self.script) / 3
+        n_prompts = 5
 
-        prompt = f"""
-        Generate {n_prompts} Image Prompts for AI Image Generation,
-        depending on the subject of a video.
-        Subject: {self.subject}
+        prompt = f"""Generate exactly {n_prompts} image prompts for AI image generation about the subject below.
+Return ONLY a JSON array of {n_prompts} strings, nothing else. No explanation, no markdown.
+Example: ["prompt one", "prompt two", "prompt three", "prompt four", "prompt five"]
 
-        The image prompts are to be returned as
-        a JSON-Array of strings.
-
-        Each search term should consist of a full sentence,
-        always add the main subject of the video.
-
-        Be emotional and use interesting adjectives to make the
-        Image Prompt as detailed as possible.
-
-        YOU MUST ONLY RETURN THE JSON-ARRAY OF STRINGS.
-        YOU MUST NOT RETURN ANYTHING ELSE.
-        YOU MUST NOT RETURN THE SCRIPT.
-
-        The search terms must be related to the subject of the video.
-        Here is an example of a JSON-Array of strings:
-        ["image prompt 1", "image prompt 2", "image prompt 3"]
-
-        For context, here is the full text:
-        {self.script}
-        """
+Subject: {self.subject}"""
 
         completion = (
             str(self.generate_response(prompt))
             .replace("```json", "")
             .replace("```", "")
+            .strip()
         )
 
         image_prompts = []
 
-        if "image_prompts" in completion:
-            image_prompts = json.loads(completion)["image_prompts"]
-        else:
-            try:
-                image_prompts = json.loads(completion)
+        try:
+            parsed = json.loads(completion)
+            if isinstance(parsed, list):
+                image_prompts = [str(p) for p in parsed if p]
+            elif isinstance(parsed, dict) and "image_prompts" in parsed:
+                image_prompts = parsed["image_prompts"]
+        except Exception:
+            # Try to extract [...] substring
+            r = re.compile(r"\[.*?\]", re.DOTALL)
+            match = r.search(completion)
+            if match:
+                try:
+                    image_prompts = json.loads(match.group())
+                except Exception:
+                    pass
+
+        if not image_prompts:
+            if _retries < 3:
                 if get_verbose():
-                    info(f" => Generated Image Prompts: {image_prompts}")
-            except Exception:
-                if get_verbose():
-                    warning(
-                        "LLM returned an unformatted response. Attempting to clean..."
-                    )
+                    warning("Failed to parse image prompts. Retrying...")
+                return self.generate_prompts(_retries=_retries + 1)
+            # Fallback: generate simple prompts from subject
+            if get_verbose():
+                warning("Using fallback image prompts.")
+            image_prompts = [
+                f"peaceful {self.subject} scene with warm golden light",
+                f"inspiring {self.subject} meditation landscape",
+                f"serene {self.subject} nature background",
+                f"calming {self.subject} sunrise visualization",
+                f"uplifting {self.subject} spiritual energy",
+            ]
 
-                # Get everything between [ and ], and turn it into a list
-                r = re.compile(r"\[.*\]")
-                image_prompts = r.findall(completion)
-                if len(image_prompts) == 0:
-                    if get_verbose():
-                        warning("Failed to generate Image Prompts. Retrying...")
-                    return self.generate_prompts()
-
-        if len(image_prompts) > n_prompts:
-            image_prompts = image_prompts[: int(n_prompts)]
-
+        image_prompts = image_prompts[:n_prompts]
         self.image_prompts = image_prompts
 
+        if get_verbose():
+            info(f" => Generated Image Prompts: {image_prompts}")
         success(f"Generated {len(image_prompts)} Image Prompts.")
 
         return image_prompts
