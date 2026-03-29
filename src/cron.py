@@ -4,9 +4,6 @@ import sys
 from status import *
 from cache import get_accounts, get_products
 from config import get_verbose
-from classes.Tts import TTS
-from classes.Twitter import Twitter
-from classes.YouTube import YouTube
 from llm_provider import select_model
 
 def main():
@@ -40,6 +37,7 @@ def main():
     verbose = get_verbose()
 
     if purpose == "twitter":
+        from classes.Twitter import Twitter
         accounts = get_accounts("twitter")
 
         if not account_id:
@@ -60,6 +58,8 @@ def main():
                     success("Done posting.")
                 break
     elif purpose == "youtube":
+        from classes.Tts import TTS
+        from classes.YouTube import YouTube
         tts = TTS()
 
         accounts = get_accounts("youtube")
