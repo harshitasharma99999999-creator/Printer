@@ -70,6 +70,13 @@ jobs:
           }
           EOF
 
+      - name: Create .mp cache directory
+        run: |
+          mkdir -p .mp
+          cat > .mp/youtube.json << 'EOF'
+          {"accounts": [{"id": "944ff01c-c1ee-44f4-a59f-cb3f44b056c0", "nickname": "universe", "firefox_profile": "", "niche": "manifestation", "language": "english", "videos": []}]}
+          EOF
+
       - name: Restore YouTube OAuth token
         run: echo '${{ secrets.YOUTUBE_TOKEN_JSON }}' > token.json
 
