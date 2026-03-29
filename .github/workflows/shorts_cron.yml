@@ -1,8 +1,8 @@
-name: Long-Form YouTube Video
+name: YouTube Shorts
 
 on:
   schedule:
-    - cron: "30 2 * * *"   # 8:00 AM IST daily
+    - cron: "0 4 * * *"   # 9:30 AM IST daily
   workflow_dispatch: {}
 
 jobs:
@@ -43,7 +43,7 @@ jobs:
             "nanobanana2_api_base_url": "https://generativelanguage.googleapis.com/v1beta",
             "nanobanana2_api_key": "${{ secrets.GEMINI_API_KEY }}",
             "nanobanana2_model": "gemini-2.5-flash-image",
-            "nanobanana2_aspect_ratio": "16:9",
+            "nanobanana2_aspect_ratio": "9:16",
             "threads": 2,
             "zip_url": "",
             "is_for_kids": false,
@@ -74,7 +74,7 @@ jobs:
           }
           EOF
 
-      - name: Create .mp cache directory
+      - name: Create .mp cache
         run: |
           mkdir -p .mp
           cat > .mp/youtube.json << 'EOF'
@@ -84,7 +84,7 @@ jobs:
       - name: Restore YouTube OAuth token
         run: echo '${{ secrets.YOUTUBE_TOKEN_JSON }}' > token.json
 
-      - name: Run long-form pipeline
+      - name: Run Shorts pipeline
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: python src/cron.py longform 944ff01c-c1ee-44f4-a59f-cb3f44b056c0 groq "law of attraction"
+        run: python src/cron.py youtube 944ff01c-c1ee-44f4-a59f-cb3f44b056c0 groq

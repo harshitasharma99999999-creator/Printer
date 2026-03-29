@@ -17,22 +17,9 @@ from constants import *
 from typing import List
 from moviepy.editor import *
 from termcolor import colored
-from selenium_firefox import *
-from selenium import webdriver
 from moviepy.video.fx.all import crop
-from moviepy.config import change_settings
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from moviepy.video.tools.subtitles import SubtitlesClip
-from webdriver_manager.firefox import GeckoDriverManager
 from datetime import datetime
-
-# Set ImageMagick Path
-change_settings({"IMAGEMAGICK_BINARY": get_imagemagick_path()})
 
 
 class YouTube:
@@ -78,33 +65,6 @@ class YouTube:
         self._language: str = language
 
         self.images = []
-
-        # Initialize the Firefox profile
-        self.options: Options = Options()
-
-        # Set headless state of browser
-        if get_headless():
-            self.options.add_argument("--headless")
-
-        if not os.path.isdir(self._fp_profile_path):
-            raise ValueError(
-                f"Firefox profile path does not exist or is not a directory: {self._fp_profile_path}"
-            )
-
-        self.options.add_argument("-profile")
-        self.options.add_argument(self._fp_profile_path)
-
-        # Kill any lingering Firefox processes before starting a new session
-        close_running_selenium_instances()
-        time.sleep(2)
-
-        # Set the service
-        self.service: Service = Service(GeckoDriverManager().install())
-
-        # Initialize the browser
-        self.browser: webdriver.Firefox = webdriver.Firefox(
-            service=self.service, options=self.options
-        )
 
     def set_subject(self, subject: str) -> None:
         """Override topic generation with a specific subject (e.g. product name)."""
@@ -719,157 +679,69 @@ class YouTube:
 
         return path
 
-    def get_channel_id(self) -> str:
-        """
-        Gets the Channel ID of the YouTube Account.
+    @staticmethod
+    def _get_yt_credentials():
+        import json
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
 
-        Returns:
-            channel_id (str): The Channel ID.
-        """
-        driver = self.browser
-        driver.get("https://studio.youtube.com")
-        time.sleep(2)
-        channel_id = driver.current_url.split("/")[-1]
-        self.channel_id = channel_id
-
-        return channel_id
+        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
+        if token_json:
+            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+        else:
+            token_path = os.path.join(ROOT_DIR, "token.json")
+            if not os.path.exists(token_path):
+                raise FileNotFoundError("token.json not found. Run scripts/setup_youtube_auth.py first.")
+            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        return creds
 
     def upload_video(self) -> bool:
         """
-        Uploads the video to YouTube.
+        Uploads the video to YouTube via Data API v3.
 
         Returns:
             success (bool): Whether the upload was successful or not.
         """
-        try:
-            self.get_channel_id()
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaFileUpload
 
-            driver = self.browser
+        try:
+            creds = self._get_yt_credentials()
+            youtube = build("youtube", "v3", credentials=creds)
             verbose = get_verbose()
 
-            # Go to youtube.com/upload
-            driver.get("https://www.youtube.com/upload")
+            body = {
+                "snippet": {
+                    "title": self.metadata.get("title", self.subject)[:100],
+                    "description": self.metadata.get("description", "")[:5000],
+                    "tags": self.metadata.get("tags", []),
+                    "categoryId": "22",
+                },
+                "status": {
+                    "privacyStatus": "public",
+                    "selfDeclaredMadeForKids": get_is_for_kids(),
+                },
+            }
 
-            # Set video file
-            file_picker = WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.TAG_NAME, "ytcp-uploads-file-picker"))
-            )
-            file_input = file_picker.find_element(By.TAG_NAME, "input")
-            file_input.send_keys(self.video_path)
-
-            # Wait for upload dialog to fully load (title + description boxes)
-            time.sleep(5)
-            WebDriverWait(driver, 30).until(
-                lambda d: len(d.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)) >= 2
-            )
-            textboxes = driver.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)
-
-            title_el = textboxes[0]
-            description_el = textboxes[-1]
+            media = MediaFileUpload(self.video_path, chunksize=-1, resumable=True)
+            request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
 
             if verbose:
-                info("\t=> Setting title...")
+                info("Uploading Short to YouTube...")
+            response = None
+            while response is None:
+                _, response = request.next_chunk()
 
-            title_el.click()
-            time.sleep(1)
-            title_el.send_keys(Keys.CONTROL + "a")
-            title_el.send_keys(Keys.DELETE)
-            title_el.send_keys(self.metadata["title"])
-
-            if verbose:
-                info("\t=> Setting description...")
-
-            # Set description
-            time.sleep(10)
-            description_el.click()
-            time.sleep(0.5)
-            description_el.send_keys(Keys.CONTROL + "a")
-            description_el.send_keys(Keys.DELETE)
-            description_el.send_keys(self.metadata["description"])
-
-            time.sleep(0.5)
-
-            # Set `made for kids` option
-            if verbose:
-                info("\t=> Setting `made for kids` option...")
-
-            is_for_kids_checkbox = driver.find_element(
-                By.NAME, YOUTUBE_MADE_FOR_KIDS_NAME
-            )
-            is_not_for_kids_checkbox = driver.find_element(
-                By.NAME, YOUTUBE_NOT_MADE_FOR_KIDS_NAME
-            )
-
-            if not get_is_for_kids():
-                is_not_for_kids_checkbox.click()
-            else:
-                is_for_kids_checkbox.click()
-
-            time.sleep(0.5)
-
-            # Click Next x3 (with WebDriverWait for reliability)
-            if verbose:
-                info("\t=> Clicking next (3x)...")
-            for _ in range(3):
-                next_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.ID, YOUTUBE_NEXT_BUTTON_ID))
-                )
-                next_button.click()
-                time.sleep(2)
-
-            # Set as Public
-            if verbose:
-                info("\t=> Setting as public...")
-
-            try:
-                public_radio = WebDriverWait(driver, 15).until(
-                    EC.element_to_be_clickable((By.XPATH, "//*[@name='PUBLIC']"))
-                )
-                public_radio.click()
-            except Exception:
-                # Fallback: find by text label
-                time.sleep(3)
-                for btn in driver.find_elements(By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH):
-                    if "Public" in btn.text and "Unlisted" not in btn.text:
-                        btn.click()
-                        break
-
-            if verbose:
-                info("\t=> Clicking done button...")
-
-            # Click done button
-            done_button = driver.find_element(By.ID, YOUTUBE_DONE_BUTTON_ID)
-            done_button.click()
-
-            # Wait for 2 seconds
-            time.sleep(2)
-
-            # Get latest video
-            if verbose:
-                info("\t=> Getting video URL...")
-
-            # Get the latest uploaded video URL
-            driver.get(
-                f"https://studio.youtube.com/channel/{self.channel_id}/videos/short"
-            )
-            time.sleep(2)
-            videos = driver.find_elements(By.TAG_NAME, "ytcp-video-row")
-            first_video = videos[0]
-            anchor_tag = first_video.find_element(By.TAG_NAME, "a")
-            href = anchor_tag.get_attribute("href")
-            if verbose:
-                info(f"\t=> Extracting video ID from URL: {href}")
-            video_id = href.split("/")[-2]
-
-            # Build URL
+            video_id = response["id"]
             url = build_url(video_id)
-
             self.uploaded_video_url = url
 
             if verbose:
-                success(f" => Uploaded Video: {url}")
+                success(f"Short uploaded: {url}")
 
-            # Add video to cache
             self.add_video(
                 {
                     "title": self.metadata["title"],
@@ -878,19 +750,12 @@ class YouTube:
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 }
             )
-
-            # Close the browser
-            driver.quit()
-
             return True
+
         except Exception as e:
-            print(f"[Upload Error] {type(e).__name__}: {e}")
             import traceback
+            warning(f"Short upload error: {e}")
             traceback.print_exc()
-            try:
-                self.browser.quit()
-            except:
-                pass
             return False
 
     def get_videos(self) -> List[dict]:
