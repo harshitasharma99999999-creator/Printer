@@ -2,6 +2,10 @@ __pycache__
 config.json
 token.json
 client_secrets.json
+geckodriver.log
+*.mp3
+*.mp4
+*.wav
 .mp/
 venv/
 Songs/
