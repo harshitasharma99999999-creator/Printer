@@ -1,0 +1,80 @@
+name: Web App Builder
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"   # Every Sunday 11:30 AM IST
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Create config.json
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "verbose": true,
+            "firefox_profile": "",
+            "headless": true,
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_model": "tinyllama",
+            "groq_api_key": "",
+            "groq_model": "llama-3.3-70b-versatile",
+            "nanobanana2_api_base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "nanobanana2_api_key": "${{ secrets.GEMINI_API_KEY }}",
+            "nanobanana2_model": "gemini-2.5-flash-image",
+            "nanobanana2_aspect_ratio": "9:16",
+            "threads": 2,
+            "zip_url": "",
+            "is_for_kids": false,
+            "google_maps_scraper": "",
+            "email": {"smtp_server": "smtp.gmail.com", "smtp_port": 587, "username": "", "password": ""},
+            "google_maps_scraper_niche": "",
+            "scraper_timeout": 300,
+            "outreach_message_subject": "",
+            "outreach_message_body_file": "outreach_message.html",
+            "stt_provider": "local_whisper",
+            "whisper_model": "base",
+            "whisper_device": "auto",
+            "whisper_compute_type": "int8",
+            "assembly_ai_api_key": "",
+            "tts_voice": "Jasper",
+            "font": "bold_font.ttf",
+            "imagemagick_path": "/usr/bin/convert",
+            "script_sentence_length": 5,
+            "affiliate_link": "",
+            "gumroad_access_token": "",
+            "ebook_price": 4.99,
+            "ebook_author": "Harshita Sharma",
+            "kdp_firefox_profile": "",
+            "gumroad_firefox_profile": "",
+            "kdp_affiliate_link": "",
+            "kdp_email": "",
+            "kdp_password": ""
+          }
+          EOF
+
+      - name: Run Web App Builder
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DODO_API_KEY: ${{ secrets.DODO_API_KEY }}
+          DODO_PRODUCT_ID: ${{ secrets.DODO_PRODUCT_ID }}
+        run: python src/webapp_runner.py
