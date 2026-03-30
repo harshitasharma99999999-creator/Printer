@@ -454,28 +454,30 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.firefox.options import Options
-        from selenium.webdriver.firefox.service import Service
-        profile_path = get_gumroad_firefox_profile()
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+
         gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
         gumroad_password = os.environ.get("GUMROAD_PASSWORD", "").strip()
 
-        if not profile_path and not (gumroad_email and gumroad_password):
-            warning("gumroad_firefox_profile not set and GUMROAD_EMAIL/GUMROAD_PASSWORD not set — skipping Gumroad.")
+        if not (gumroad_email and gumroad_password):
+            warning("GUMROAD_EMAIL/GUMROAD_PASSWORD not set — skipping Gumroad.")
             return ""
 
         if get_verbose():
-            info("Opening Gumroad in Firefox...")
+            info("Opening Gumroad in Chrome...")
 
         options = Options()
-        if profile_path:
-            options.profile = profile_path
         if get_headless():
             options.add_argument("--headless")
-        driver = webdriver.Firefox(service=Service(), options=options)
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        driver = webdriver.Chrome(service=Service(), options=options)
 
-        # CI login: if no pre-auth profile, login with email + password
-        if not profile_path and gumroad_email:
+        # Login with email + password
+        if gumroad_email:
             try:
                 driver.get("https://app.gumroad.com/login")
                 time.sleep(4)
@@ -669,26 +671,28 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.firefox.options import Options
-        from selenium.webdriver.firefox.service import Service
-        profile_path = get_kdp_firefox_profile()
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+
         kdp_email_cfg = get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip()
         kdp_pass_cfg = get_kdp_password() or os.environ.get("KDP_PASSWORD", "").strip()
 
-        if not profile_path and not (kdp_email_cfg and kdp_pass_cfg):
-            warning("kdp_firefox_profile not set and KDP_EMAIL/KDP_PASSWORD not set — skipping KDP.")
+        if not (kdp_email_cfg and kdp_pass_cfg):
+            warning("KDP_EMAIL/KDP_PASSWORD not set — skipping KDP.")
             return
 
         if get_verbose():
-            info("Opening KDP in Firefox...")
+            info("Opening KDP in Chrome...")
 
         options = Options()
-        if profile_path:
-            options.profile = profile_path
         if get_headless():
             options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
 
-        driver = webdriver.Firefox(service=Service(), options=options)
+        driver = webdriver.Chrome(service=Service(), options=options)
 
         def _try_selectors(selectors, timeout=10):
             """Try multiple selectors, return first matching element or None."""
