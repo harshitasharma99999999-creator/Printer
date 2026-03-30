@@ -98,10 +98,13 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             else:
                 raise ValueError(f"Could not parse LLM config: {response[:300]}")
 
-        # Sanitize app_slug
+        # Sanitize app_slug and append today's date so daily runs don't collide
+        from datetime import datetime
         slug = re.sub(r"[^a-z0-9-]", "-", config["app_slug"].lower())
-        slug = re.sub(r"-+", "-", slug).strip("-")[:40]
-        config["app_slug"] = slug or "my-saas-app"
+        slug = re.sub(r"-+", "-", slug).strip("-")[:32]
+        slug = slug or "my-saas-app"
+        date_suffix = datetime.now().strftime("%m%d")
+        config["app_slug"] = f"{slug}-{date_suffix}"
 
         if get_verbose():
             info(f"App config: {config['app_name']} — {config['tagline']}")
