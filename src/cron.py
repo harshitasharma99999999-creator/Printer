@@ -1,10 +1,24 @@
 # RUN THIS N AMOUNT OF TIMES
 import sys
+import random
 
 from status import *
 from cache import get_accounts, get_products
 from config import get_verbose
 from llm_provider import select_model
+
+SHORTS_NICHES = [
+    "manifestation",
+    "law of attraction",
+    "abundance mindset",
+    "self love and confidence",
+    "morning motivation",
+    "gratitude and positivity",
+    "mindfulness and peace",
+    "success habits",
+    "stoicism",
+    "spiritual awakening",
+]
 
 def main():
     """Main function to post content to Twitter or upload videos to YouTube.
@@ -71,11 +85,14 @@ def main():
             if acc["id"] == account_id:
                 if verbose:
                     info("Initializing YouTube...")
+                niche = random.choice(SHORTS_NICHES)
+                if verbose:
+                    info(f"Random niche selected: {niche}")
                 youtube = YouTube(
                     acc["id"],
                     acc["nickname"],
                     acc["firefox_profile"],
-                    acc["niche"],
+                    niche,
                     acc["language"]
                 )
                 youtube.generate_video(tts)
@@ -127,7 +144,7 @@ def main():
             if acc["id"] == account_id:
                 if verbose:
                     info("Initializing LongForm...")
-                chosen_niche = niche if niche else acc.get("niche", LONG_FORM_NICHES[0])
+                chosen_niche = niche if niche else random.choice(LONG_FORM_NICHES)
                 lf = LongForm(
                     acc["id"],
                     acc["nickname"],

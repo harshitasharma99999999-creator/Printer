@@ -5,6 +5,14 @@ import srt_equalizer
 
 from termcolor import colored
 
+# Pillow 10+ removed Image.ANTIALIAS — patch it back so MoviePy 1.0.3 works
+try:
+    from PIL import Image as _PILImage
+    if not hasattr(_PILImage, "ANTIALIAS"):
+        _PILImage.ANTIALIAS = _PILImage.LANCZOS
+except Exception:
+    pass
+
 ROOT_DIR = os.path.dirname(sys.path[0])
 
 def assert_folder_structure() -> None:
