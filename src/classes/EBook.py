@@ -1245,15 +1245,17 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         self.format_epub()
 
         gumroad_url = ""
-        if get_gumroad_access_token():
+        _gumroad_ok = get_gumroad_access_token() or os.environ.get("GUMROAD_EMAIL", "").strip()
+        if _gumroad_ok:
             gumroad_url = self.publish_to_gumroad()
         else:
-            warning("Skipping Gumroad (no access token). Set gumroad_access_token in config.json.")
+            warning("Skipping Gumroad (no access token or GUMROAD_EMAIL). Set gumroad_access_token in config.json.")
 
-        if get_kdp_firefox_profile():
+        _kdp_ok = get_kdp_firefox_profile() or (get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip())
+        if _kdp_ok:
             self.publish_to_kdp()
         else:
-            warning("Skipping KDP (no kdp_firefox_profile). Set kdp_firefox_profile in config.json.")
+            warning("Skipping KDP (no kdp_firefox_profile or KDP_EMAIL). Set kdp_firefox_profile in config.json.")
 
         result = {
             "id": str(uuid.uuid4()),
