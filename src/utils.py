@@ -134,26 +134,33 @@ def fetch_songs() -> None:
         error(f"Error occurred while fetching songs: {str(e)}")
 
 
-def choose_random_song() -> str:
+def choose_random_song():
     """
-    Chooses a random song from the songs/ directory.
+    Chooses a random song from the Songs/ directory.
+    Returns None if the directory doesn't exist or is empty (CI/headless mode).
 
     Returns:
-        str: The path to the chosen song.
+        str | None: The path to the chosen song, or None if unavailable.
     """
     try:
         songs_dir = os.path.join(ROOT_DIR, "Songs")
+        if not os.path.exists(songs_dir):
+            if get_verbose():
+                warning("Songs directory not found — running without background music.")
+            return None
         songs = [
             name
             for name in os.listdir(songs_dir)
             if os.path.isfile(os.path.join(songs_dir, name))
             and name.lower().endswith((".mp3", ".wav", ".m4a", ".aac", ".ogg"))
         ]
-        if len(songs) == 0:
-            raise RuntimeError("No audio files found in Songs directory")
+        if not songs:
+            if get_verbose():
+                warning("No audio files in Songs directory — running without background music.")
+            return None
         song = random.choice(songs)
         success(f" => Chose song: {song}")
         return os.path.join(ROOT_DIR, "Songs", song)
     except Exception as e:
-        error(f"Error occurred while choosing random song: {str(e)}")
-        raise
+        warning(f"Error choosing random song: {str(e)} — continuing without background music.")
+        return None

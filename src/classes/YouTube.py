@@ -613,11 +613,12 @@ Subject: {self.subject}"""
         except Exception as e:
             warning(f"Failed to generate subtitles, continuing without subtitles: {e}")
 
-        random_song_clip = AudioFileClip(random_song).set_fps(44100)
-
-        # Turn down volume
-        random_song_clip = random_song_clip.fx(afx.volumex, 0.1)
-        comp_audio = CompositeAudioClip([tts_clip.set_fps(44100), random_song_clip])
+        if random_song:
+            random_song_clip = AudioFileClip(random_song).set_fps(44100)
+            random_song_clip = random_song_clip.fx(afx.volumex, 0.1)
+            comp_audio = CompositeAudioClip([tts_clip.set_fps(44100), random_song_clip])
+        else:
+            comp_audio = tts_clip.set_fps(44100)
 
         final_clip = final_clip.set_audio(comp_audio)
         final_clip = final_clip.set_duration(tts_clip.duration)
