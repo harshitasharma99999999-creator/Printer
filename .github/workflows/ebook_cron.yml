@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y firefox libjpeg-dev zlib1g-dev libpng-dev
+          GECKO_VER=0.35.0
+          wget -q "https://github.com/mozilla/geckodriver/releases/download/v${GECKO_VER}/geckodriver-v${GECKO_VER}-linux64.tar.gz" -O /tmp/gd.tar.gz
+          tar xzf /tmp/gd.tar.gz -C /tmp/
+          sudo mv /tmp/geckodriver /usr/local/bin/
+          geckodriver --version
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt

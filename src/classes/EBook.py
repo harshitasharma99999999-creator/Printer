@@ -456,8 +456,6 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.firefox.options import Options
         from selenium.webdriver.firefox.service import Service
-        from webdriver_manager.firefox import GeckoDriverManager
-
         profile_path = get_gumroad_firefox_profile()
         gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
         gumroad_password = os.environ.get("GUMROAD_PASSWORD", "").strip()
@@ -474,10 +472,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             options.profile = profile_path
         if get_headless():
             options.add_argument("--headless")
-        driver = webdriver.Firefox(
-            service=Service(GeckoDriverManager().install()),
-            options=options
-        )
+        driver = webdriver.Firefox(service=Service(), options=options)
 
         # CI login: if no pre-auth profile, login with email + password
         if not profile_path and gumroad_email:
@@ -676,8 +671,6 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.firefox.options import Options
         from selenium.webdriver.firefox.service import Service
-        from webdriver_manager.firefox import GeckoDriverManager
-
         profile_path = get_kdp_firefox_profile()
         kdp_email_cfg = get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip()
         kdp_pass_cfg = get_kdp_password() or os.environ.get("KDP_PASSWORD", "").strip()
@@ -695,10 +688,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         if get_headless():
             options.add_argument("--headless")
 
-        driver = webdriver.Firefox(
-            service=Service(GeckoDriverManager().install()),
-            options=options
-        )
+        driver = webdriver.Firefox(service=Service(), options=options)
 
         def _try_selectors(selectors, timeout=10):
             """Try multiple selectors, return first matching element or None."""
