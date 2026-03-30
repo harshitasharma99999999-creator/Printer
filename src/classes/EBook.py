@@ -69,7 +69,95 @@ class EBook:
         self.chapters: list[dict] = []   # [{title, body}, ...]
         self.pdf_path: str = ""
         self.epub_path: str = ""
+        self.cover_path: str = ""
         self.slug: str = ""
+
+    # ------------------------------------------------------------------
+    # Step 3b: Generate cover image
+    # ------------------------------------------------------------------
+
+    def generate_cover_image(self) -> str:
+        """Generate a simple ebook cover image with PIL. Returns path."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            import textwrap as _tw
+
+            width, height = 1600, 2400
+            img = Image.new("RGB", (width, height))
+            draw = ImageDraw.Draw(img)
+
+            # Purple→indigo gradient background
+            for y in range(height):
+                ratio = y / height
+                r = int(72 + ratio * (49 - 72))
+                g = int(0 + ratio * (27 - 0))
+                b = int(180 + ratio * (146 - 180))
+                draw.line([(0, y), (width, y)], fill=(r, g, b))
+
+            # Decorative top bar
+            draw.rectangle([0, 0, width, 30], fill=(255, 215, 0))
+            draw.rectangle([0, height - 30, width, height], fill=(255, 215, 0))
+
+            # Load fonts — fall back to default if not available
+            font_paths = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            ]
+            font_paths_regular = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            ]
+            font_title = font_sub = font_author = ImageFont.load_default()
+            for fp in font_paths:
+                if os.path.exists(fp):
+                    font_title = ImageFont.truetype(fp, 88)
+                    font_sub = ImageFont.truetype(fp, 52)
+                    break
+            for fp in font_paths_regular:
+                if os.path.exists(fp):
+                    font_author = ImageFont.truetype(fp, 58)
+                    break
+
+            # Title — wrapped and centred
+            lines = _tw.wrap(self.title, width=22)
+            y_text = 350
+            for line in lines[:6]:
+                bbox = draw.textbbox((0, 0), line, font=font_title)
+                tw = bbox[2] - bbox[0]
+                x = (width - tw) // 2
+                draw.text((x + 3, y_text + 3), line, fill=(0, 0, 0), font=font_title)
+                draw.text((x, y_text), line, fill=(255, 255, 255), font=font_title)
+                y_text += 105
+
+            # Subtitle
+            if self.subtitle:
+                sub_lines = _tw.wrap(self.subtitle, width=32)
+                y_text += 30
+                for line in sub_lines[:3]:
+                    bbox = draw.textbbox((0, 0), line, font=font_sub)
+                    tw = bbox[2] - bbox[0]
+                    x = (width - tw) // 2
+                    draw.text((x, y_text), line, fill=(200, 200, 255), font=font_sub)
+                    y_text += 65
+
+            # Author
+            author_text = f"by {get_ebook_author() or 'Harshita Sharma'}"
+            bbox = draw.textbbox((0, 0), author_text, font=font_author)
+            tw = bbox[2] - bbox[0]
+            draw.text(((width - tw) // 2, height - 220), author_text,
+                      fill=(255, 215, 0), font=font_author)
+
+            cover_path = os.path.join(ROOT_DIR, ".mp", f"ebook-cover-{self.slug}.png")
+            img.save(cover_path, "PNG")
+            if get_verbose():
+                info(f"Cover image saved: {cover_path}")
+            return cover_path
+        except Exception as e:
+            if get_verbose():
+                warning(f"Cover image generation failed: {e}")
+            return ""
 
     # ------------------------------------------------------------------
     # Step 1: Trending topics
@@ -591,18 +679,39 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 if get_verbose():
                     warning("Gumroad: save button not found")
 
-            # Upload PDF file
+            # Upload cover image (thumbnail) + PDF
+            # Gumroad has multiple hidden file inputs; reveal them with JS then send_keys
             try:
-                upload_input = wait.until(EC.presence_of_element_located(
-                    (By.XPATH, "//input[@type='file']")
-                ))
-                upload_input.send_keys(self.pdf_path)
-                time.sleep(5)
+                file_inputs = driver.find_elements(By.XPATH, "//input[@type='file']")
                 if get_verbose():
-                    info("PDF uploaded to Gumroad.")
-            except Exception:
+                    info(f"Gumroad: found {len(file_inputs)} file input(s).")
+                for inp in file_inputs:
+                    driver.execute_script("arguments[0].style.display = 'block';", inp)
+
+                # First input = cover/thumbnail, second = content file
+                if self.cover_path and len(file_inputs) >= 1:
+                    try:
+                        file_inputs[0].send_keys(self.cover_path)
+                        time.sleep(3)
+                        if get_verbose():
+                            info("Cover image uploaded to Gumroad.")
+                    except Exception as _ce:
+                        if get_verbose():
+                            warning(f"Cover upload failed: {_ce}")
+
+                pdf_input = file_inputs[1] if len(file_inputs) >= 2 else (file_inputs[0] if file_inputs else None)
+                if pdf_input and self.pdf_path:
+                    try:
+                        pdf_input.send_keys(self.pdf_path)
+                        time.sleep(6)
+                        if get_verbose():
+                            info("PDF uploaded to Gumroad.")
+                    except Exception as _pe:
+                        if get_verbose():
+                            warning(f"PDF upload failed: {_pe}")
+            except Exception as _ue:
                 if get_verbose():
-                    warning("File upload field not found — may need manual upload.")
+                    warning(f"File upload section error: {_ue}")
 
             # Advance from content/upload step → share/publish step
             for _by, _sel in [
@@ -1146,10 +1255,39 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 if get_verbose():
                     info(f"KDP navigated to: {driver.current_url}")
 
-            # Content page — upload EPUB
+            # Content page — upload cover image then EPUB
             # KDP renders <input type="file"> as display:none (React UI).
-            # Must use presence_of_element_located + JS visibility override.
 
+            # Upload cover image first (KDP requires it)
+            if self.cover_path and os.path.exists(self.cover_path):
+                cover_btn_selectors = [
+                    (By.XPATH, "//button[contains(text(),'Upload cover')]"),
+                    (By.XPATH, "//button[contains(text(),'Upload your cover')]"),
+                    (By.XPATH, "//span[contains(text(),'Upload cover')]"),
+                ]
+                cover_btn = _try_selectors(cover_btn_selectors, timeout=6)
+                if cover_btn:
+                    try:
+                        cover_btn.click()
+                        time.sleep(2)
+                    except Exception:
+                        pass
+                try:
+                    # KDP cover input is typically the first file input on the page
+                    all_inputs = WebDriverWait(driver, 10).until(
+                        lambda d: d.find_elements(By.XPATH, "//input[@type='file']")
+                    )
+                    if all_inputs:
+                        driver.execute_script("arguments[0].style.display = 'block';", all_inputs[0])
+                        all_inputs[0].send_keys(self.cover_path)
+                        time.sleep(5)
+                        if get_verbose():
+                            info("KDP: cover image uploaded.")
+                except Exception as _ce:
+                    if get_verbose():
+                        warning(f"KDP cover upload failed: {_ce}")
+
+            # Upload EPUB manuscript
             # Step 1: click any visible Upload button to initialize KDP's state
             upload_btn_selectors = [
                 (By.XPATH, "//button[contains(text(),'Upload manuscript')]"),
@@ -1169,7 +1307,9 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
             # Step 2: locate hidden file input and force-show it
             try:
-                upload_el = WebDriverWait(driver, 20).until(
+                all_file_inputs = driver.find_elements(By.XPATH, "//input[@type='file']")
+                # Use last file input for manuscript (cover used first input)
+                upload_el = all_file_inputs[-1] if all_file_inputs else WebDriverWait(driver, 20).until(
                     EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
                 )
                 driver.execute_script("arguments[0].style.display = 'block';", upload_el)
@@ -1263,6 +1403,9 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
         info("Formatting EPUB...")
         self.format_epub()
+
+        info("Generating cover image...")
+        self.cover_path = self.generate_cover_image()
 
         gumroad_url = ""
         _gumroad_ok = get_gumroad_access_token() or os.environ.get("GUMROAD_EMAIL", "").strip()
