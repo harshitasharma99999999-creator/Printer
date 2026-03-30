@@ -157,6 +157,14 @@ def main():
                 if verbose:
                     success("Long-form video uploaded.")
                 break
+    elif purpose == "ebook":
+        from classes.EBook import EBook
+        if verbose:
+            info("Initializing EBook pipeline...")
+        ebook = EBook()
+        ebook.run()
+        if verbose:
+            success("EBook pipeline complete.")
     else:
         error("Invalid Purpose, exiting...")
         sys.exit(1)

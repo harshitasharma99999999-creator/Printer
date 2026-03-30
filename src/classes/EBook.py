@@ -10,7 +10,7 @@ from typing import Optional
 
 from status import *
 from config import (
-    ROOT_DIR, get_verbose, get_ebook_author, get_ebook_price,
+    ROOT_DIR, get_verbose, get_headless, get_ebook_author, get_ebook_price,
     get_gumroad_access_token, get_kdp_firefox_profile,
     get_gumroad_firefox_profile, get_kdp_affiliate_link,
     get_kdp_email, get_kdp_password
@@ -459,19 +459,65 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         from webdriver_manager.firefox import GeckoDriverManager
 
         profile_path = get_gumroad_firefox_profile()
-        if not profile_path:
-            warning("gumroad_firefox_profile not set — skipping Gumroad.")
+        gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
+        gumroad_password = os.environ.get("GUMROAD_PASSWORD", "").strip()
+
+        if not profile_path and not (gumroad_email and gumroad_password):
+            warning("gumroad_firefox_profile not set and GUMROAD_EMAIL/GUMROAD_PASSWORD not set — skipping Gumroad.")
             return ""
 
         if get_verbose():
             info("Opening Gumroad in Firefox...")
 
         options = Options()
-        options.profile = profile_path
+        if profile_path:
+            options.profile = profile_path
+        if get_headless():
+            options.add_argument("--headless")
         driver = webdriver.Firefox(
             service=Service(GeckoDriverManager().install()),
             options=options
         )
+
+        # CI login: if no pre-auth profile, login with email + password
+        if not profile_path and gumroad_email:
+            try:
+                driver.get("https://app.gumroad.com/login")
+                time.sleep(4)
+                for by, sel in [
+                    (By.ID, "email"), (By.NAME, "email"),
+                    (By.XPATH, "//input[@type='email']"),
+                ]:
+                    try:
+                        em = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
+                        em.clear(); em.send_keys(gumroad_email); break
+                    except Exception:
+                        continue
+                for by, sel in [
+                    (By.ID, "password"), (By.NAME, "password"),
+                    (By.XPATH, "//input[@type='password']"),
+                ]:
+                    try:
+                        pw = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
+                        pw.clear(); pw.send_keys(gumroad_password); break
+                    except Exception:
+                        continue
+                for by, sel in [
+                    (By.XPATH, "//button[@type='submit']"),
+                    (By.XPATH, "//input[@type='submit']"),
+                ]:
+                    try:
+                        WebDriverWait(driver, 5).until(EC.element_to_be_clickable((by, sel))).click()
+                        break
+                    except Exception:
+                        continue
+                time.sleep(5)
+                if get_verbose():
+                    info(f"Gumroad login attempted. URL: {driver.current_url}")
+            except Exception as _le:
+                if get_verbose():
+                    warning(f"Gumroad login failed: {_le}")
+
         wait = WebDriverWait(driver, 30)
         product_url = ""
 
@@ -607,15 +653,21 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         from webdriver_manager.firefox import GeckoDriverManager
 
         profile_path = get_kdp_firefox_profile()
-        if not profile_path:
-            warning("kdp_firefox_profile not set in config.json — skipping KDP.")
+        kdp_email_cfg = get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip()
+        kdp_pass_cfg = get_kdp_password() or os.environ.get("KDP_PASSWORD", "").strip()
+
+        if not profile_path and not (kdp_email_cfg and kdp_pass_cfg):
+            warning("kdp_firefox_profile not set and KDP_EMAIL/KDP_PASSWORD not set — skipping KDP.")
             return
 
         if get_verbose():
             info("Opening KDP in Firefox...")
 
         options = Options()
-        options.profile = profile_path
+        if profile_path:
+            options.profile = profile_path
+        if get_headless():
+            options.add_argument("--headless")
 
         driver = webdriver.Firefox(
             service=Service(GeckoDriverManager().install()),

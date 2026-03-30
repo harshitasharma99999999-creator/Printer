@@ -1,0 +1,83 @@
+name: EBook Publisher
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # Every day 6:30 AM IST
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y firefox libjpeg-dev zlib1g-dev libpng-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create config.json
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "verbose": true,
+            "firefox_profile": "",
+            "headless": true,
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_model": "tinyllama",
+            "groq_api_key": "",
+            "groq_model": "llama-3.3-70b-versatile",
+            "nanobanana2_api_base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "nanobanana2_api_key": "",
+            "nanobanana2_model": "gemini-2.5-flash-image",
+            "nanobanana2_aspect_ratio": "9:16",
+            "threads": 2,
+            "zip_url": "",
+            "is_for_kids": false,
+            "google_maps_scraper": "",
+            "email": {"smtp_server": "smtp.gmail.com", "smtp_port": 587, "username": "", "password": ""},
+            "google_maps_scraper_niche": "",
+            "scraper_timeout": 300,
+            "outreach_message_subject": "",
+            "outreach_message_body_file": "outreach_message.html",
+            "stt_provider": "local_whisper",
+            "whisper_model": "base",
+            "whisper_device": "auto",
+            "whisper_compute_type": "int8",
+            "assembly_ai_api_key": "",
+            "tts_voice": "Jasper",
+            "font": "bold_font.ttf",
+            "imagemagick_path": "/usr/bin/convert",
+            "script_sentence_length": 5,
+            "affiliate_link": "https://www.amazon.in/b?node=88307513031&linkCode=ll2&tag=harshita000-21",
+            "gumroad_access_token": "",
+            "gumroad_firefox_profile": "",
+            "ebook_price": 4.99,
+            "ebook_author": "Harshita Sharma",
+            "kdp_firefox_profile": "",
+            "kdp_affiliate_link": "https://www.amazon.in/b?node=88307513031&linkCode=ll2&tag=harshita000-21",
+            "kdp_email": "",
+            "kdp_password": "",
+            "twitter_language": "English"
+          }
+          EOF
+
+      - name: Create .mp cache directory
+        run: mkdir -p .mp
+
+      - name: Run EBook pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GUMROAD_EMAIL: ${{ secrets.GUMROAD_EMAIL }}
+          GUMROAD_PASSWORD: ${{ secrets.GUMROAD_PASSWORD }}
+          KDP_EMAIL: ${{ secrets.KDP_EMAIL }}
+          KDP_PASSWORD: ${{ secrets.KDP_PASSWORD }}
+        run: python src/cron.py ebook dummy-id groq
