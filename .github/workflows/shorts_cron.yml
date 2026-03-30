@@ -19,7 +19,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg imagemagick
+          sudo apt-get install -y ffmpeg imagemagick libjpeg-dev zlib1g-dev libpng-dev
 
       - name: Fix ImageMagick security policy
         run: |
