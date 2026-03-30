@@ -470,10 +470,9 @@ class LongForm:
 
     def combine(self) -> str:
         from moviepy.editor import (
-            AudioFileClip, ImageClip, TextClip, CompositeVideoClip,
+            AudioFileClip, ImageClip, CompositeVideoClip,
             CompositeAudioClip, concatenate_videoclips,
         )
-        from moviepy.video.tools.subtitles import SubtitlesClip
         import random
 
         if not self.images:
@@ -525,24 +524,33 @@ class LongForm:
 
         final = final.set_audio(audio)
 
-        # Subtitles
+        # Render video WITHOUT subtitles first (MoviePy SubtitlesClip is too slow for long-form)
+        vid_path = os.path.join(ROOT_DIR, ".mp", f"lf-video-{uuid4().hex[:8]}.mp4")
+        final.write_videofile(vid_path, threads=get_threads(), fps=24, codec="libx264", preset="faster")
+
+        # Burn subtitles with ffmpeg (much faster than MoviePy compositor)
         try:
+            import subprocess as _sp
             srt_path = self.generate_subtitles()
-            font_path = os.path.join(get_fonts_dir(), get_font())
-            generator = lambda txt: TextClip(
-                txt, font=font_path, fontsize=52,
-                color="#FFFF00", stroke_color="black", stroke_width=3,
-                size=(1920, 1080), method="caption",
+            vid_subs = vid_path.replace(".mp4", "_subs.mp4")
+            _sp.run(
+                [
+                    "ffmpeg", "-y", "-i", vid_path,
+                    "-vf", (
+                        f"subtitles={srt_path}:force_style="
+                        "'FontName=Arial,FontSize=18,PrimaryColour=&H00FFFF00,"
+                        "OutlineColour=&H00000000,Outline=3,Alignment=2'"
+                    ),
+                    "-c:a", "copy", vid_subs,
+                ],
+                check=True,
+                timeout=600,
             )
-            subs = SubtitlesClip(srt_path, make_textclip=generator)
-            subs = subs.set_position(("center", "bottom"))
-            final = CompositeVideoClip([final, subs])
+            os.replace(vid_subs, vid_path)
         except Exception as e:
             if get_verbose():
                 warning(f"Subtitles skipped: {e}")
 
-        vid_path = os.path.join(ROOT_DIR, ".mp", f"lf-video-{uuid4().hex[:8]}.mp4")
-        final.write_videofile(vid_path, threads=get_threads(), fps=30)
         self.video_path = vid_path
         if get_verbose():
             success(f"Long-form video saved: {vid_path}")
