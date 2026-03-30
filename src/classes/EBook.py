@@ -761,12 +761,12 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 if get_verbose():
                     info(f"KDP after ToS: {page_title} | {current_url}")
 
-            # Handle login redirect — auto-login with credentials from config.json
+            # Handle login redirect — auto-login with credentials from config or env vars
             if "signin" in current_url or "ap/signin" in current_url:
-                kdp_email = get_kdp_email()
-                kdp_password = get_kdp_password()
+                kdp_email = get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip()
+                kdp_password = get_kdp_password() or os.environ.get("KDP_PASSWORD", "").strip()
                 if not kdp_email or not kdp_password:
-                    warning("KDP login required. Set kdp_email and kdp_password in config.json.")
+                    warning("KDP login required. Set kdp_email and kdp_password in config.json or as env vars.")
                     driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-debug.png"))
                     return
 
