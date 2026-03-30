@@ -114,6 +114,7 @@ def main():
                 yt_accounts = get_accounts("youtube")
                 if yt_accounts:
                     yt_account = yt_accounts[0]
+                    from classes.Tts import TTS
                     tts = TTS()
                     from classes.YouTube import YouTube
                     youtube = YouTube(
