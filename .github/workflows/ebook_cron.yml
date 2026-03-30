@@ -82,11 +82,7 @@ jobs:
           GUMROAD_PASSWORD: ${{ secrets.GUMROAD_PASSWORD }}
           KDP_EMAIL: ${{ secrets.KDP_EMAIL }}
           KDP_PASSWORD: ${{ secrets.KDP_PASSWORD }}
-          # Bypass GitHub Actions internal HTTP proxy so external API calls work
           NO_PROXY: "*"
-          no_proxy: "*"
           HTTP_PROXY: ""
           HTTPS_PROXY: ""
-          http_proxy: ""
-          https_proxy: ""
         run: python src/cron.py ebook dummy-id groq
