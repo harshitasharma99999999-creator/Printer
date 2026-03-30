@@ -49,6 +49,11 @@ def main():
     except Exception:
         pass
 
+    # Allow workflow to override caption (e.g. AFM uses a product-specific caption)
+    caption_override = os.environ.get("INSTAGRAM_CAPTION", "").strip()
+    if caption_override:
+        caption = caption_override
+
     from classes.Instagram import Instagram
     ig = Instagram(username, password)
     try:

@@ -81,7 +81,11 @@ jobs:
           {"accounts": [{"id": "944ff01c-c1ee-44f4-a59f-cb3f44b056c0", "nickname": "universe", "firefox_profile": "", "niche": "manifestation", "language": "english", "videos": []}]}
           EOF
           cat > .mp/afm.json << 'EOF'
-          {"products": [{"id": "afm-product-001", "affiliate_link": "https://www.amazon.in/b?node=88307513031&linkCode=ll2&tag=harshita000-21"}]}
+          {"products": [
+            {"id": "afm-manifestation", "affiliate_link": "https://www.amazon.in/s?k=manifestation+crystals+healing&tag=harshita000-21"},
+            {"id": "afm-spiritual",     "affiliate_link": "https://www.amazon.in/s?k=spiritual+healing+products+india&tag=harshita000-21"},
+            {"id": "afm-meditation",    "affiliate_link": "https://www.amazon.in/s?k=meditation+yoga+wellness&tag=harshita000-21"}
+          ]}
           EOF
 
       - name: Restore YouTube OAuth token
@@ -90,4 +94,17 @@ jobs:
       - name: Run AFM pipeline
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: python src/cron.py afm afm-product-001 groq
+        run: |
+          IDS=("afm-manifestation" "afm-spiritual" "afm-meditation")
+          RANDOM_ID=${IDS[$RANDOM % ${#IDS[@]}]}
+          echo "Selected niche: $RANDOM_ID"
+          python src/cron.py afm $RANDOM_ID groq
+
+      - name: Upload to Instagram Reels
+        continue-on-error: true
+        env:
+          INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+          INSTAGRAM_SESSION_JSON: ${{ secrets.INSTAGRAM_SESSION_JSON }}
+          INSTAGRAM_CAPTION: "✨ Elevate your energy ✨\n\nShop healing & manifestation products on Amazon India — link in bio!\n\n#manifestation #healing #crystals #spirituality #lawofattraction #abundance #spiritual #meditation #yoga #wellness #shorts #reels #viral #fyp"
+        run: python src/instagram_runner.py
