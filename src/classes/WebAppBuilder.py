@@ -230,6 +230,52 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         success(f"Deployed to {base_url}")
         return base_url
 
+    def tweet_launch(self, config: dict, url: str) -> bool:
+        """Post a launch tweet via Twitter API v2 (OAuth 1.0a)."""
+        api_key = os.environ.get("TWITTER_API_KEY", "").strip()
+        api_secret = os.environ.get("TWITTER_API_SECRET", "").strip()
+        access_token = os.environ.get("TWITTER_ACCESS_TOKEN", "").strip()
+        access_token_secret = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET", "").strip()
+
+        if not all([api_key, api_secret, access_token, access_token_secret]):
+            if get_verbose():
+                warning("Twitter API credentials not set — skipping tweet. "
+                        "Set TWITTER_API_KEY, TWITTER_API_SECRET, "
+                        "TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET secrets.")
+            return False
+
+        features = config.get("features", [])
+        feat_lines = "\n".join(
+            f"✅ {f['name']}" for f in features[:3]
+        )
+        tweet = (
+            f"🚀 Just launched {config['app_name']}!\n\n"
+            f"{config['tagline']}\n\n"
+            f"{feat_lines}\n\n"
+            f"Try it FREE 👉 {url}\n\n"
+            f"#SaaS #startup #indiehacker #buildinpublic #AI"
+        )
+        # Trim to 280 chars if needed
+        if len(tweet) > 280:
+            tweet = tweet[:277] + "..."
+
+        try:
+            import tweepy
+            client = tweepy.Client(
+                consumer_key=api_key,
+                consumer_secret=api_secret,
+                access_token=access_token,
+                access_token_secret=access_token_secret,
+            )
+            client.create_tweet(text=tweet)
+            if get_verbose():
+                success(f"Tweet posted: {tweet[:80]}...")
+            return True
+        except Exception as e:
+            if get_verbose():
+                warning(f"Tweet failed: {e}")
+            return False
+
     def print_marketing_plan(self, config: dict, url: str):
         print("\n" + "=" * 60)
         print("MARKETING PLAN — POST THIS AFTER LAUNCH")
@@ -257,6 +303,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         app_dir = self.build_app(config)
         url = self.deploy(app_dir, config)
         self.print_marketing_plan(config, url)
+        self.tweet_launch(config, url)
 
         success(f"Done! App live at: {url}")
         return url
