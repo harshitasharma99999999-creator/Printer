@@ -9,12 +9,14 @@ jobs:
   keepalive:
     runs-on: ubuntu-latest
     permissions:
-      actions: write
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Keep workflows active
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          time_elapsed: 50
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git commit --allow-empty -m "chore: keepalive [skip ci]"
+          git push

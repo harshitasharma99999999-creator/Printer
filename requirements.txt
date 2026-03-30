@@ -9,7 +9,7 @@ selenium_firefox
 selenium
 ollama
 moviepy==1.0.3
-Pillow>=10.0.0
+Pillow==9.5.0
 yagmail
 assemblyai
 faster-whisper
