@@ -37,13 +37,21 @@ def get_active_model() -> str | None:
 def generate_text(prompt: str, model_name: str = None) -> str:
     if _use_groq():
         from groq import Groq
+        import time as _time
         client = Groq(api_key=_groq_key())
-        response = client.chat.completions.create(
-            model=get_groq_model(),
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1024,
-        )
-        return response.choices[0].message.content.strip()
+        _last_exc = None
+        for _attempt in range(3):
+            try:
+                response = client.chat.completions.create(
+                    model=get_groq_model(),
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=1024,
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as _e:
+                _last_exc = _e
+                _time.sleep(5 * (_attempt + 1))
+        raise _last_exc
 
     # Ollama fallback
     model = model_name or _selected_model

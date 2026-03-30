@@ -82,7 +82,7 @@ class EBook:
         # Google Trends
         try:
             from pytrends.request import TrendReq
-            pt = TrendReq(hl="en-US", tz=330)
+            pt = TrendReq(hl="en-US", tz=330, timeout=(5, 15))
             df = pt.today_searches(pn="IN")
             topics.extend(df.tolist()[:5])
             topics = [t for t in topics if not any(kw in t.lower() for kw in NEWS_BLOCKLIST)]
@@ -607,15 +607,41 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 if get_verbose():
                     warning("File upload field not found — may need manual upload.")
 
-            # Save / Publish
-            try:
-                pub_btn = wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "//button[contains(text(),'Save') or contains(text(),'Publish') or contains(text(),'Done')]")
-                ))
-                pub_btn.click()
-                time.sleep(4)
-            except Exception:
-                pass
+            # Advance from content/upload step → share/publish step
+            for _by, _sel in [
+                (By.XPATH, "//button[contains(text(),'Save and continue')]"),
+                (By.XPATH, "//button[contains(text(),'Continue')]"),
+                (By.XPATH, "//button[contains(text(),'Next')]"),
+            ]:
+                try:
+                    _btn = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((_by, _sel)))
+                    _btn.click()
+                    time.sleep(4)
+                    break
+                except Exception:
+                    continue
+
+            # Publish — click Publish explicitly (not Save which leaves it as draft)
+            _published = False
+            for _by, _sel in [
+                (By.XPATH, "//button[text()='Publish']"),
+                (By.XPATH, "//button[normalize-space()='Publish']"),
+                (By.XPATH, "//button[contains(text(),'Publish')]"),
+                (By.XPATH, "//input[@type='submit' and contains(@value,'Publish')]"),
+                (By.XPATH, "//button[contains(text(),'Done')]"),
+            ]:
+                try:
+                    _pub = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((_by, _sel)))
+                    _pub.click()
+                    time.sleep(4)
+                    _published = True
+                    if get_verbose():
+                        info("Gumroad: Publish button clicked — product is now live.")
+                    break
+                except Exception:
+                    continue
+            if not _published and get_verbose():
+                warning("Gumroad: Publish button not found — product may remain as draft.")
 
             # Grab the product URL from current page
             current = driver.current_url
