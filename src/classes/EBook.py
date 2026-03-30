@@ -824,14 +824,46 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 # Step 3: Handle OTP / 2FA if Amazon asks for it
                 after_url = driver.current_url
                 if any(x in after_url for x in ["ap/mfa", "auth-mfa", "ap/cvf", "verification", "challenge"]):
-                    if get_verbose():
-                        warning("KDP: OTP/2FA required. Enter it in the Firefox window. Waiting 120s...")
-                    # Wait up to 120s for user to manually enter OTP
-                    deadline = time.time() + 120
-                    while time.time() < deadline:
-                        if "signin" not in driver.current_url and "mfa" not in driver.current_url and "challenge" not in driver.current_url:
-                            break
-                        time.sleep(2)
+                    totp_secret = os.environ.get("KDP_TOTP_SECRET", "").strip()
+                    if totp_secret:
+                        try:
+                            import pyotp
+                            otp_code = pyotp.TOTP(totp_secret).now()
+                            if get_verbose():
+                                info(f"KDP: Auto-filling TOTP code...")
+                            for by, sel in [
+                                (By.ID, "auth-mfa-otpcode"),
+                                (By.NAME, "otpCode"),
+                                (By.XPATH, "//input[@type='text' and contains(@id,'otp')]"),
+                                (By.XPATH, "//input[@type='tel']"),
+                                (By.XPATH, "//input[@autocomplete='one-time-code']"),
+                                (By.XPATH, "//input[@type='number']"),
+                            ]:
+                                try:
+                                    otp_el = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
+                                    otp_el.clear()
+                                    otp_el.send_keys(otp_code)
+                                    break
+                                except Exception:
+                                    continue
+                            for by, sel in [
+                                (By.ID, "auth-signin-button"),
+                                (By.XPATH, "//input[@type='submit']"),
+                                (By.XPATH, "//button[@type='submit']"),
+                            ]:
+                                try:
+                                    WebDriverWait(driver, 5).until(EC.element_to_be_clickable((by, sel))).click()
+                                    break
+                                except Exception:
+                                    continue
+                            time.sleep(4)
+                        except ImportError:
+                            warning("KDP: pyotp not installed — cannot auto-fill TOTP. pip install pyotp")
+                            return
+                    else:
+                        warning("KDP: 2FA required but KDP_TOTP_SECRET not set. "
+                                "Set it if using authenticator app, or disable 2FA on your Amazon account.")
+                        return
 
                 # Check login succeeded
                 if "signin" in driver.current_url or "ap/signin" in driver.current_url:
