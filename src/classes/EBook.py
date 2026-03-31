@@ -553,12 +553,26 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         if get_verbose():
             info("Opening Gumroad in undetected Chrome...")
 
+        def _chrome_major_version():
+            try:
+                import subprocess as _sp
+                out = _sp.run(["google-chrome", "--version"], capture_output=True, text=True).stdout
+                return int(out.strip().split()[2].split(".")[0])
+            except Exception:
+                return None
+
         options = uc.ChromeOptions()
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
-        driver = uc.Chrome(options=options, headless=get_headless(), use_subprocess=False)
+        _chrome_ver = _chrome_major_version()
+        driver = uc.Chrome(
+            options=options,
+            headless=get_headless(),
+            use_subprocess=False,
+            **( {"version_main": _chrome_ver} if _chrome_ver else {} ),
+        )
 
         # Login with email + password
         if gumroad_email:
@@ -787,13 +801,27 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         if get_verbose():
             info("Opening KDP in undetected Chrome...")
 
+        def _chrome_major_version():
+            try:
+                import subprocess as _sp
+                out = _sp.run(["google-chrome", "--version"], capture_output=True, text=True).stdout
+                return int(out.strip().split()[2].split(".")[0])
+            except Exception:
+                return None
+
         options = uc.ChromeOptions()
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
 
-        driver = uc.Chrome(options=options, headless=get_headless(), use_subprocess=False)
+        _chrome_ver = _chrome_major_version()
+        driver = uc.Chrome(
+            options=options,
+            headless=get_headless(),
+            use_subprocess=False,
+            **( {"version_main": _chrome_ver} if _chrome_ver else {} ),
+        )
 
         def _try_selectors(selectors, timeout=10):
             """Try multiple selectors, return first matching element or None."""
