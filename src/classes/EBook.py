@@ -1087,41 +1087,66 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     return
 
                 # Step 3: Handle OTP / 2FA if Amazon asks for it
+                _OTP_PATTERNS = ["ap/mfa", "auth-mfa", "ap/cvf", "verification", "challenge", "ax/claim", "new-signin"]
                 after_url = driver.current_url
-                if any(x in after_url for x in ["ap/mfa", "auth-mfa", "ap/cvf", "verification", "challenge"]):
+                if any(x in after_url for x in _OTP_PATTERNS):
+                    if get_verbose():
+                        info(f"KDP: OTP/2FA page detected: {after_url[:120]}")
+                    driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-otp-page.png"))
                     totp_secret = os.environ.get("KDP_TOTP_SECRET", "").strip()
                     if totp_secret:
                         try:
                             import pyotp
+                            # Regenerate code right before filling (30-second window)
                             otp_code = pyotp.TOTP(totp_secret).now()
                             if get_verbose():
-                                info(f"KDP: Auto-filling TOTP code...")
+                                info(f"KDP: Auto-filling TOTP code (page: {after_url[:80]})...")
+                            otp_filled = False
                             for by, sel in [
                                 (By.ID, "auth-mfa-otpcode"),
                                 (By.NAME, "otpCode"),
+                                (By.NAME, "code"),
+                                (By.XPATH, "//input[@autocomplete='one-time-code']"),
                                 (By.XPATH, "//input[@type='text' and contains(@id,'otp')]"),
                                 (By.XPATH, "//input[@type='tel']"),
-                                (By.XPATH, "//input[@autocomplete='one-time-code']"),
                                 (By.XPATH, "//input[@type='number']"),
+                                (By.XPATH, "//input[@type='text']"),
                             ]:
                                 try:
-                                    otp_el = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
+                                    otp_el = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((by, sel)))
                                     otp_el.clear()
                                     otp_el.send_keys(otp_code)
+                                    otp_filled = True
                                     break
                                 except Exception:
                                     continue
+                            if not otp_filled:
+                                if get_verbose():
+                                    warning(f"KDP: could not find OTP input field on {after_url[:80]}")
+                                driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-otp-debug.png"))
                             for by, sel in [
                                 (By.ID, "auth-signin-button"),
+                                (By.XPATH, "//input[@id='auth-signin-button']"),
                                 (By.XPATH, "//input[@type='submit']"),
                                 (By.XPATH, "//button[@type='submit']"),
+                                (By.XPATH, "//button[contains(text(),'Sign in')]"),
+                                (By.XPATH, "//button[contains(text(),'Continue')]"),
                             ]:
                                 try:
                                     WebDriverWait(driver, 5).until(EC.element_to_be_clickable((by, sel))).click()
                                     break
                                 except Exception:
                                     continue
-                            time.sleep(4)
+                            # Wait for URL to navigate away from OTP page
+                            try:
+                                WebDriverWait(driver, 15).until(
+                                    lambda d: not any(x in d.current_url for x in _OTP_PATTERNS)
+                                )
+                            except Exception:
+                                pass
+                            time.sleep(3)
+                            if get_verbose():
+                                info(f"KDP after TOTP submit: {driver.current_url[:100]}")
                         except ImportError:
                             warning("KDP: pyotp not installed — cannot auto-fill TOTP. pip install pyotp")
                             return
@@ -1134,9 +1159,11 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                         driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-otp-debug.png"))
                         return
 
-                # Check login succeeded
-                if "signin" in driver.current_url or "ap/signin" in driver.current_url:
-                    warning("KDP login failed — check credentials in config.json.")
+                # Check login succeeded — reject if still on any auth/signin page
+                _fail_patterns = ["ap/signin", "ap/mfa", "ap/cvf", "ax/claim", "auth-mfa", "signin?"]
+                if any(x in driver.current_url for x in _fail_patterns):
+                    warning(f"KDP login failed — still on auth page: {driver.current_url[:120]}")
+                    driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-login-failed.png"))
                     return
 
                 if get_verbose():
