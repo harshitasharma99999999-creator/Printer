@@ -537,13 +537,11 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         Publish PDF to Gumroad via Selenium (Gumroad API v2 is discontinued).
         Uses pre-authenticated Firefox profile. Returns the product URL.
         """
-        from selenium import webdriver
+        import undetected_chromedriver as uc
         from selenium.webdriver.common.by import By
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.chrome.service import Service
 
         gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
         gumroad_password = os.environ.get("GUMROAD_PASSWORD", "").strip()
@@ -553,16 +551,14 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             return ""
 
         if get_verbose():
-            info("Opening Gumroad in Chrome...")
+            info("Opening Gumroad in undetected Chrome...")
 
-        options = Options()
-        if get_headless():
-            options.add_argument("--headless")
+        options = uc.ChromeOptions()
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
-        driver = webdriver.Chrome(service=Service(), options=options)
+        driver = uc.Chrome(options=options, headless=get_headless(), use_subprocess=False)
 
         # Login with email + password
         if gumroad_email:
@@ -775,13 +771,11 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         Uses a pre-authenticated Firefox profile for kdp.amazon.com.
         Note: KDP takes 24-72h to review before going live.
         """
-        from selenium import webdriver
+        import undetected_chromedriver as uc
         from selenium.webdriver.common.by import By
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.chrome.service import Service
 
         kdp_email_cfg = get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip()
         kdp_pass_cfg = get_kdp_password() or os.environ.get("KDP_PASSWORD", "").strip()
@@ -791,17 +785,15 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             return
 
         if get_verbose():
-            info("Opening KDP in Chrome...")
+            info("Opening KDP in undetected Chrome...")
 
-        options = Options()
-        if get_headless():
-            options.add_argument("--headless")
+        options = uc.ChromeOptions()
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
 
-        driver = webdriver.Chrome(service=Service(), options=options)
+        driver = uc.Chrome(options=options, headless=get_headless(), use_subprocess=False)
 
         def _try_selectors(selectors, timeout=10):
             """Try multiple selectors, return first matching element or None."""
@@ -990,8 +982,12 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                             warning("KDP: pyotp not installed — cannot auto-fill TOTP. pip install pyotp")
                             return
                     else:
-                        warning("KDP: 2FA required but KDP_TOTP_SECRET not set. "
-                                "Set it if using authenticator app, or disable 2FA on your Amazon account.")
+                        warning("KDP: OTP/2FA required but KDP_TOTP_SECRET not set. "
+                                "Amazon is verifying the new device (GitHub Actions IP). "
+                                "To fix: enable Google Authenticator 2FA on your Amazon account, "
+                                "copy the secret key, and add it as GitHub secret KDP_TOTP_SECRET. "
+                                "Skipping KDP this run.")
+                        driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-otp-debug.png"))
                         return
 
                 # Check login succeeded
