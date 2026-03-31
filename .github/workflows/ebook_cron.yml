@@ -84,6 +84,7 @@ jobs:
           GUMROAD_PASSWORD: ${{ secrets.GUMROAD_PASSWORD }}
           KDP_EMAIL: ${{ secrets.KDP_EMAIL }}
           KDP_PASSWORD: ${{ secrets.KDP_PASSWORD }}
+          KDP_TOTP_SECRET: ${{ secrets.KDP_TOTP_SECRET }}
           NO_PROXY: "*"
           HTTP_PROXY: ""
           HTTPS_PROXY: ""
