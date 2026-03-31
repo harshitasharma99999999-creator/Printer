@@ -638,6 +638,12 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 time.sleep(8)
                 if get_verbose():
                     info(f"Gumroad post-login URL: {driver.current_url}")
+                    try:
+                        page_body = driver.find_element(By.TAG_NAME, "body").text[:800]
+                        info(f"Gumroad post-login page: {page_body}")
+                        driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "gumroad-postlogin.png"))
+                    except Exception:
+                        pass
             except Exception as _le:
                 if get_verbose():
                     warning(f"Gumroad login failed: {_le}")
