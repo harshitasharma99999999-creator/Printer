@@ -967,6 +967,26 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             el.send_keys(text)
 
         try:
+            # Inject saved session cookies to skip login/OTP entirely
+            kdp_session_json = os.environ.get("KDP_SESSION_JSON", "").strip()
+            if kdp_session_json:
+                try:
+                    import json as _json
+                    kdp_cookies = _json.loads(kdp_session_json)
+                    # Load cookies for both domains
+                    for seed_url in ["https://www.amazon.com", "https://kdp.amazon.com"]:
+                        driver.get(seed_url)
+                        time.sleep(2)
+                        for cookie in kdp_cookies:
+                            try:
+                                driver.add_cookie(cookie)
+                            except Exception:
+                                pass
+                    if get_verbose():
+                        info("KDP: injected saved session cookies.")
+                except Exception as _ce:
+                    warning(f"KDP: could not load KDP_SESSION_JSON ({_ce}), proceeding with login.")
+
             driver.get("https://kdp.amazon.com/en_US/title-setup/kindle/new/details")
             time.sleep(6)  # wait for React to render
 

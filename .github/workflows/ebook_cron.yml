@@ -85,6 +85,7 @@ jobs:
           KDP_EMAIL: ${{ secrets.KDP_EMAIL }}
           KDP_PASSWORD: ${{ secrets.KDP_PASSWORD }}
           KDP_TOTP_SECRET: ${{ secrets.KDP_TOTP_SECRET }}
+          KDP_SESSION_JSON: ${{ secrets.KDP_SESSION_JSON }}
           NO_PROXY: "*"
           HTTP_PROXY: ""
           HTTPS_PROXY: ""
