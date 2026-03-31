@@ -578,37 +578,66 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         if gumroad_email:
             try:
                 driver.get("https://app.gumroad.com/login")
-                time.sleep(4)
+                # Wait longer for Cloudflare challenge to resolve before interacting
+                time.sleep(12)
+                if get_verbose():
+                    info(f"Gumroad page after load: {driver.current_url} | title: {driver.title[:80]}")
+                    # Log first 500 chars of page body for debugging
+                    try:
+                        body_text = driver.find_element(By.TAG_NAME, "body").text[:500]
+                        info(f"Gumroad page body preview: {body_text}")
+                    except Exception:
+                        pass
+
+                email_filled = False
                 for by, sel in [
                     (By.ID, "email"), (By.NAME, "email"),
                     (By.XPATH, "//input[@type='email']"),
+                    (By.XPATH, "//input[contains(@placeholder,'email') or contains(@placeholder,'Email')]"),
                 ]:
                     try:
                         em = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
-                        em.clear(); em.send_keys(gumroad_email); break
+                        em.clear(); em.send_keys(gumroad_email)
+                        email_filled = True
+                        if get_verbose():
+                            info(f"Gumroad: email filled (selector: {sel})")
+                        break
                     except Exception:
                         continue
+                if not email_filled and get_verbose():
+                    warning("Gumroad: email field not found — Cloudflare may still be blocking.")
+                    try:
+                        driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "gumroad-login-debug.png"))
+                    except Exception:
+                        pass
+
                 for by, sel in [
                     (By.ID, "password"), (By.NAME, "password"),
                     (By.XPATH, "//input[@type='password']"),
                 ]:
                     try:
                         pw = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((by, sel)))
-                        pw.clear(); pw.send_keys(gumroad_password); break
+                        pw.clear(); pw.send_keys(gumroad_password)
+                        if get_verbose():
+                            info("Gumroad: password filled.")
+                        break
                     except Exception:
                         continue
                 for by, sel in [
                     (By.XPATH, "//button[@type='submit']"),
                     (By.XPATH, "//input[@type='submit']"),
+                    (By.XPATH, "//button[contains(text(),'Log in') or contains(text(),'Sign in') or contains(text(),'Continue')]"),
                 ]:
                     try:
                         WebDriverWait(driver, 5).until(EC.element_to_be_clickable((by, sel))).click()
+                        if get_verbose():
+                            info("Gumroad: submit clicked.")
                         break
                     except Exception:
                         continue
-                time.sleep(5)
+                time.sleep(8)
                 if get_verbose():
-                    info(f"Gumroad login attempted. URL: {driver.current_url}")
+                    info(f"Gumroad post-login URL: {driver.current_url}")
             except Exception as _le:
                 if get_verbose():
                     warning(f"Gumroad login failed: {_le}")
