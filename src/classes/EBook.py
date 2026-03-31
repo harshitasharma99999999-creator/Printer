@@ -1097,10 +1097,30 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     if totp_secret:
                         try:
                             import pyotp
+                            # Amazon may default to phone/SMS OTP — try to switch to authenticator app first
+                            for xpath in [
+                                "//a[contains(text(),'Authenticator')]",
+                                "//button[contains(text(),'Authenticator')]",
+                                "//a[contains(text(),'different method')]",
+                                "//button[contains(text(),'different method')]",
+                                "//a[contains(text(),'different way')]",
+                                "//button[contains(text(),'different way')]",
+                                "//a[contains(text(),'Try another way')]",
+                                "//a[contains(text(),'Use a different')]",
+                            ]:
+                                try:
+                                    el = driver.find_element(By.XPATH, xpath)
+                                    el.click()
+                                    time.sleep(2)
+                                    if get_verbose():
+                                        info(f"KDP: switched to authenticator method via: {xpath}")
+                                    break
+                                except Exception:
+                                    continue
                             # Regenerate code right before filling (30-second window)
                             otp_code = pyotp.TOTP(totp_secret).now()
                             if get_verbose():
-                                info(f"KDP: Auto-filling TOTP code (page: {after_url[:80]})...")
+                                info(f"KDP: Auto-filling TOTP code (page: {driver.current_url[:80]})...")
                             otp_filled = False
                             for by, sel in [
                                 (By.ID, "auth-mfa-otpcode"),
