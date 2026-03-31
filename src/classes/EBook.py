@@ -532,11 +532,71 @@ p  { margin-bottom: 0.8em; text-align: justify; }
     # Step 5a: Publish to Gumroad via Selenium
     # ------------------------------------------------------------------
 
+    def _publish_gumroad_api(self, access_token: str) -> str:
+        """Publish to Gumroad using API v2 (no Selenium needed)."""
+        base = "https://api.gumroad.com/v2"
+
+        # Step 1: Create product
+        r = requests.post(f"{base}/products", data={
+            "access_token": access_token,
+            "name": self.title[:100],
+            "price": int(get_ebook_price() * 100),  # cents
+            "description": self.description[:2000],
+        }, timeout=20)
+
+        if not r.ok:
+            warning(f"Gumroad API create failed: {r.status_code} {r.text[:300]}")
+            return ""
+
+        product = r.json().get("product", {})
+        product_id = product.get("id", "")
+        product_url = product.get("short_url", "")
+        if get_verbose():
+            info(f"Gumroad product created (draft): {product_url}")
+
+        # Step 2: Upload PDF file
+        if self.pdf_path and os.path.exists(self.pdf_path):
+            try:
+                with open(self.pdf_path, "rb") as f:
+                    r2 = requests.post(
+                        f"{base}/products/{product_id}/product_files",
+                        data={"access_token": access_token},
+                        files={"file": (os.path.basename(self.pdf_path), f, "application/pdf")},
+                        timeout=60,
+                    )
+                if get_verbose():
+                    info(f"Gumroad PDF upload: {r2.status_code}")
+            except Exception as _fe:
+                if get_verbose():
+                    warning(f"Gumroad PDF upload failed: {_fe}")
+
+        # Step 3: Publish
+        r3 = requests.put(f"{base}/products/{product_id}", data={
+            "access_token": access_token,
+            "published": "true",
+        }, timeout=15)
+        if r3.ok:
+            success(f"Gumroad product published: {product_url}")
+        else:
+            if get_verbose():
+                warning(f"Gumroad publish step: {r3.status_code} {r3.text[:200]}")
+
+        return product_url or f"https://app.gumroad.com/products/{product_id}"
+
     def publish_to_gumroad(self) -> str:
         """
-        Publish PDF to Gumroad via Selenium (Gumroad API v2 is discontinued).
-        Uses pre-authenticated Firefox profile. Returns the product URL.
+        Publish PDF to Gumroad.
+        Prefers API (GUMROAD_ACCESS_TOKEN), falls back to Selenium login.
         """
+        # --- Preferred: API path (no Selenium, no Cloudflare) ---
+        access_token = (
+            get_gumroad_access_token()
+            or os.environ.get("GUMROAD_ACCESS_TOKEN", "").strip()
+        )
+        if access_token:
+            return self._publish_gumroad_api(access_token)
+
+        # --- Fallback: Selenium login ---
         import undetected_chromedriver as uc
         from selenium.webdriver.common.by import By
         from selenium.webdriver.common.keys import Keys
@@ -547,7 +607,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         gumroad_password = os.environ.get("GUMROAD_PASSWORD", "").strip()
 
         if not (gumroad_email and gumroad_password):
-            warning("GUMROAD_EMAIL/GUMROAD_PASSWORD not set — skipping Gumroad.")
+            warning("No Gumroad credentials (GUMROAD_ACCESS_TOKEN / GUMROAD_EMAIL+PASSWORD) — skipping.")
             return ""
 
         if get_verbose():
