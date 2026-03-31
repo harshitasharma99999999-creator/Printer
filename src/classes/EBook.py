@@ -266,11 +266,18 @@ class EBook:
         if get_verbose():
             info(f"Generating eBook content for: {self.topic}")
 
-        # Title
+        # Title — keyword-first formula proven to rank on Amazon
         title_raw = generate_text(
-            f'Write a compelling, specific eBook title for the topic: "{self.topic}". '
-            f'Include the main keyword naturally. Make it practical and benefit-focused. '
-            f'Return only the title, no quotes, no punctuation at end.'
+            f'Write a compelling Amazon Kindle eBook title for the topic: "{self.topic}"\n'
+            f'Use one of these proven formats:\n'
+            f'- "How to [Outcome]: [Number] [Methods] to [Benefit]"\n'
+            f'- "[Topic] Mastery: The Complete Guide to [Outcome]"\n'
+            f'- "The [Topic] Blueprint: [Specific Result] in [Timeframe]"\n'
+            f'Rules:\n'
+            f'- Start with the main keyword\n'
+            f'- Promise a specific, measurable benefit\n'
+            f'- Under 60 characters total\n'
+            f'Return ONLY the title, nothing else.'
         ).strip().split("\n")[0]
         self.title = title_raw[:120]
 
@@ -281,11 +288,14 @@ class EBook:
         ).strip().split("\n")[0]
         self.subtitle = subtitle_raw[:200]
 
-        # SEO keywords for Amazon (7 keyword phrases)
+        # SEO keywords for Amazon (7 keyword phrases — search-volume-aware)
         kw_raw = generate_text(
-            f'List exactly 7 Amazon Kindle search keyword phrases for the eBook "{self.title}". '
-            f'Use phrases people actually search (2-4 words each). '
-            f'Return one phrase per line, no numbers, no bullets.'
+            f'Generate exactly 7 Amazon Kindle keyword phrases for a book about: "{self.topic}"\n'
+            f'Rules:\n'
+            f'- Each phrase must be 2-5 words that people actually type into Amazon search\n'
+            f'- Mix formats: "how to [topic]", "[topic] for beginners", "best [topic] tips", "[topic] guide"\n'
+            f'- NO single words, NO brand names, NO overly broad terms\n'
+            f'Return ONLY the 7 phrases, one per line, no numbers or bullets.'
         ).strip()
         self.keywords = [
             re.sub(r'^[\d\-\.\)\s]+', '', l).strip()
@@ -294,18 +304,32 @@ class EBook:
         if get_verbose():
             info(f"Keywords: {self.keywords}")
 
-        # Description (SEO-rich, 400+ words for KDP ranking)
+        # Description — HTML-formatted, keyword-rich (KDP supports <b> and <br>)
         self.description = generate_text(
-            f'Write a 5-sentence Amazon Kindle book description for "{self.title}". '
-            f'Start with a hook. Mention the reader problem it solves. '
-            f'List 3 key benefits. End with a call to action. '
-            f'Include these keywords naturally: {", ".join(self.keywords[:4])}. '
-            f'Return only the description text.'
+            f'Write an Amazon Kindle book description for: "{self.title}"\n'
+            f'Topic: {self.topic}\n'
+            f'Keywords to include: {", ".join(self.keywords[:5])}\n\n'
+            f'Use this exact HTML format:\n'
+            f'<b>Are you struggling with [problem related to topic]?</b>\n'
+            f'<br><br>\n'
+            f'[2 sentences about the pain/problem the reader faces]\n'
+            f'<br><br>\n'
+            f'<b>Inside this book you will discover:</b>\n'
+            f'<br>\n'
+            f'• [Key benefit 1]\n'
+            f'• [Key benefit 2]\n'
+            f'• [Key benefit 3]\n'
+            f'• [Key benefit 4]\n'
+            f'• [Key benefit 5]\n'
+            f'<br><br>\n'
+            f'[1 sentence credibility/authority statement]\n'
+            f'<br><br>\n'
+            f'<b>Scroll up and click Buy Now to transform your life today!</b>\n\n'
+            f'Rules:\n'
+            f'- 400-600 words total\n'
+            f'- Include the keywords naturally in the body text\n'
+            f'- No affiliate links, no external URLs, no first-person'
         ).strip()
-        # Append affiliate link to description
-        affiliate_link = get_kdp_affiliate_link()
-        if affiliate_link:
-            self.description += f"\n\nExplore more Kindle eBooks: {affiliate_link}"
 
         # Chapter outline
         outline_raw = generate_text(
@@ -966,6 +990,11 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             el.send_keys(Keys.DELETE)
             el.send_keys(text)
 
+        def _scroll_and_fill(el, text):
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+            time.sleep(0.3)
+            _fill_el(el, text)
+
         try:
             # Inject saved session cookies to skip login/OTP entirely
             kdp_session_json = os.environ.get("KDP_SESSION_JSON", "").strip()
@@ -988,7 +1017,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     warning(f"KDP: could not load KDP_SESSION_JSON ({_ce}), proceeding with login.")
 
             driver.get("https://kdp.amazon.com/en_US/title-setup/kindle/new/details")
-            time.sleep(6)  # wait for React to render
+            time.sleep(10)  # wait for React to render (CI Chrome is slow)
 
             current_url = driver.current_url
             page_title = driver.title
@@ -1227,7 +1256,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             ]
             title_el = _try_selectors(title_selectors, timeout=15)
             if title_el:
-                _fill_el(title_el, self.title[:200])
+                _scroll_and_fill(title_el, self.title[:200])
                 time.sleep(0.5)
             else:
                 driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-debug.png"))
@@ -1242,7 +1271,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             ]
             subtitle_el = _try_selectors(subtitle_selectors, timeout=5)
             if subtitle_el and self.subtitle:
-                _fill_el(subtitle_el, self.subtitle[:200])
+                _scroll_and_fill(subtitle_el, self.subtitle[:200])
 
             # Author first/last name
             # KDP uses indexed IDs: author-first-name-0, author-last-name-0
@@ -1265,14 +1294,14 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             ]
             first_el = _try_selectors(first_selectors, timeout=8)
             if first_el:
-                _fill_el(first_el, first)
+                _scroll_and_fill(first_el, first)
                 if get_verbose():
                     info(f"KDP: author first name filled: {first}")
             else:
                 warning("KDP: author first name field not found")
             last_el = _try_selectors(last_selectors, timeout=8)
             if last_el:
-                _fill_el(last_el, last)
+                _scroll_and_fill(last_el, last)
                 if get_verbose():
                     info(f"KDP: author last name filled: {last}")
             else:
@@ -1286,7 +1315,9 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                         "//div[@contenteditable='true' and not(@aria-label='Search')]"
                     ))
                 )
-                # Click to focus, clear existing content, type description
+                # Scroll into view, click to focus, clear existing content, type description
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", desc_el)
+                time.sleep(0.3)
                 desc_el.click()
                 time.sleep(0.3)
                 desc_el.send_keys(Keys.CONTROL + "a")
@@ -1318,7 +1349,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 ]
                 kw_el = _try_selectors(kw_selectors, timeout=5)
                 if kw_el:
-                    _fill_el(kw_el, kw)
+                    _scroll_and_fill(kw_el, kw)
 
             # Answer Adult-only question (required before category can be selected)
             # KDP blocks "Save and continue" if this is unanswered
@@ -1449,7 +1480,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 time.sleep(0.5)
                 driver.execute_script("arguments[0].click();", save_el)
                 # Wait for navigation from /details to /content
-                if not _wait_for_url_fragment("content", timeout=20):
+                if not _wait_for_url_fragment("content", timeout=30):
                     time.sleep(5)
                     # Take screenshot if still on details page
                     if "details" in driver.current_url:
@@ -1461,6 +1492,10 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                             warning("KDP: still on details page after Save — check .mp/kdp-details-blocked.png")
                 if get_verbose():
                     info(f"KDP navigated to: {driver.current_url}")
+                try:
+                    driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-step-1-details.png"))
+                except Exception:
+                    pass
 
             # Content page — upload cover image then EPUB
             # KDP renders <input type="file"> as display:none (React UI).
@@ -1487,7 +1522,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     if all_inputs:
                         driver.execute_script("arguments[0].style.display = 'block';", all_inputs[0])
                         all_inputs[0].send_keys(self.cover_path)
-                        time.sleep(5)
+                        time.sleep(8)
                         if get_verbose():
                             info("KDP: cover image uploaded.")
                 except Exception as _ce:
@@ -1523,7 +1558,7 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 upload_el.send_keys(self.epub_path)
                 if get_verbose():
                     info("KDP: EPUB file path sent, waiting for upload processing...")
-                time.sleep(15)  # KDP validates the EPUB — needs extra time
+                time.sleep(25)  # KDP validates the EPUB — needs extra time on CI
                 if get_verbose():
                     info("EPUB uploaded to KDP.")
             except Exception as _e:
@@ -1536,12 +1571,18 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             # Save and continue — Content → Pricing
             save_el2 = _try_selectors(save_selectors, timeout=10)
             if save_el2:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", save_el2)
+                time.sleep(0.3)
                 save_el2.click()
                 # Wait for navigation from /content to /pricing
-                if not _wait_for_url_fragment("pricing", timeout=15):
+                if not _wait_for_url_fragment("pricing", timeout=25):
                     time.sleep(5)
                 if get_verbose():
                     info(f"KDP navigated to: {driver.current_url}")
+                try:
+                    driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-step-2-content.png"))
+                except Exception:
+                    pass
 
             # Pricing — set price (KDP uses per-territory inputs like price-value-US-)
             price_selectors = [
@@ -1553,10 +1594,53 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             ]
             price_el = _try_selectors(price_selectors, timeout=10)
             if price_el:
-                _fill_el(price_el, str(get_ebook_price()))
+                _scroll_and_fill(price_el, str(get_ebook_price()))
                 time.sleep(1)
                 if get_verbose():
                     info(f"KDP price set to {get_ebook_price()}")
+
+            # Royalty: select 70% royalty plan (valid for $2.99–$9.99)
+            royalty_selectors = [
+                (By.XPATH, "//input[@type='radio' and @value='0.70']"),
+                (By.XPATH, "//input[@type='radio' and contains(@id,'royalty-70')]"),
+                (By.XPATH, "//label[contains(text(),'70%')]/preceding-sibling::input[@type='radio']"),
+                (By.XPATH, "//label[contains(text(),'70%')]/following-sibling::input[@type='radio']"),
+                (By.XPATH, "//input[@type='radio' and @value='70']"),
+            ]
+            royalty_el = _try_selectors(royalty_selectors, timeout=8)
+            if royalty_el:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", royalty_el)
+                driver.execute_script("arguments[0].click();", royalty_el)
+                time.sleep(0.5)
+                if get_verbose():
+                    info("KDP: 70% royalty selected.")
+            else:
+                if get_verbose():
+                    warning("KDP: 70% royalty radio not found — may default to 35%.")
+
+            # Territory: select Worldwide rights
+            territory_selectors = [
+                (By.XPATH, "//input[@type='radio' and contains(@id,'worldwide')]"),
+                (By.XPATH, "//input[@type='radio' and @value='WORLD']"),
+                (By.XPATH, "//label[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'worldwide')]/preceding-sibling::input[@type='radio']"),
+                (By.XPATH, "//label[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'worldwide')]/following-sibling::input[@type='radio']"),
+                (By.XPATH, "//input[@type='radio' and @value='worldwide']"),
+            ]
+            territory_el = _try_selectors(territory_selectors, timeout=8)
+            if territory_el:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", territory_el)
+                driver.execute_script("arguments[0].click();", territory_el)
+                time.sleep(0.5)
+                if get_verbose():
+                    info("KDP: Worldwide rights selected.")
+            else:
+                if get_verbose():
+                    warning("KDP: Worldwide rights radio not found.")
+
+            try:
+                driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-step-3-pricing.png"))
+            except Exception:
+                pass
 
             # Publish button
             publish_selectors = [
@@ -1568,6 +1652,8 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             ]
             publish_el = _try_selectors(publish_selectors, timeout=10)
             if publish_el:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", publish_el)
+                time.sleep(0.3)
                 publish_el.click()
                 time.sleep(3)
                 if get_verbose():
