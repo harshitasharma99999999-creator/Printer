@@ -79,6 +79,7 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
+          GUMROAD_SESSION_JSON: ${{ secrets.GUMROAD_SESSION_JSON }}
           GUMROAD_EMAIL: ${{ secrets.GUMROAD_EMAIL }}
           GUMROAD_PASSWORD: ${{ secrets.GUMROAD_PASSWORD }}
           KDP_EMAIL: ${{ secrets.KDP_EMAIL }}

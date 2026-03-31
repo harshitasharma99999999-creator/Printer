@@ -596,18 +596,20 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         if access_token:
             return self._publish_gumroad_api(access_token)
 
-        # --- Fallback: Selenium login ---
+        # --- Fallback: Selenium with pre-authenticated session cookies ---
         import undetected_chromedriver as uc
         from selenium.webdriver.common.by import By
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
 
+        session_json = os.environ.get("GUMROAD_SESSION_JSON", "").strip()
         gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
         gumroad_password = os.environ.get("GUMROAD_PASSWORD", "").strip()
 
-        if not (gumroad_email and gumroad_password):
-            warning("No Gumroad credentials (GUMROAD_ACCESS_TOKEN / GUMROAD_EMAIL+PASSWORD) — skipping.")
+        if not (session_json or (gumroad_email and gumroad_password)):
+            warning("No Gumroad credentials — set GUMROAD_SESSION_JSON secret "
+                    "(run scripts/gen_gumroad_session.py locally) or GUMROAD_EMAIL+PASSWORD.")
             return ""
 
         if get_verbose():
@@ -634,8 +636,27 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             **( {"version_main": _chrome_ver} if _chrome_ver else {} ),
         )
 
-        # Login with email + password
-        if gumroad_email:
+        # --- Session cookie injection (preferred — skips login entirely) ---
+        if session_json:
+            try:
+                cookies = json.loads(session_json)
+                # Must visit the domain first before setting cookies
+                driver.get("https://gumroad.com")
+                time.sleep(3)
+                for cookie in cookies:
+                    # Selenium only accepts cookies for the current domain
+                    try:
+                        driver.add_cookie(cookie)
+                    except Exception:
+                        pass
+                if get_verbose():
+                    info(f"Gumroad: loaded {len(cookies)} session cookies.")
+            except Exception as _ce:
+                if get_verbose():
+                    warning(f"Gumroad: failed to load session cookies ({_ce}) — trying login.")
+
+        # Login with email + password (only if no session cookies)
+        elif gumroad_email:
             try:
                 driver.get("https://app.gumroad.com/login")
                 # Wait longer for Cloudflare challenge to resolve before interacting
