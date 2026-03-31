@@ -28,9 +28,10 @@ except ImportError as e:
     sys.exit(1)
 
 # ── Config ──────────────────────────────────────────────────────────────────
+import os as _os
 AMAZON_EMAIL    = "harshitasharma99999999@gmail.com"
 AMAZON_PASSWORD = "@ABC123xyz"
-GITHUB_TOKEN    = ""  # set via env: GITHUB_PAT=your_token
+GITHUB_TOKEN    = _os.environ.get("GITHUB_PAT", "")
 GITHUB_REPO     = "harshitasharma99999999-creator/Printer"
 # ─────────────────────────────────────────────────────────────────────────────
 
