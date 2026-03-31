@@ -110,7 +110,14 @@ class YouTube:
             topic (str): The generated topic.
         """
         completion = self.generate_response(
-            f"Please generate a specific video idea that takes about the following topic: {self.niche}. Make it exactly one sentence. Only return the topic, nothing else."
+            f"""Generate a compelling YouTube video topic about: {self.niche}
+Style: "Jung Thoughts" channel — philosophical, psychological, dark wisdom.
+Use formats like:
+- "What a Healed Empath Really Becomes – The Uncomfortable Truth"
+- "The Shadow Self: Why Your Darkest Traits Hold Your Greatest Power"
+- "Why Sensitive People Are Actually the Strongest – A Psychological Warning"
+- "What Happens to Your Mind When You Stop Seeking Approval"
+Return ONLY the video topic as one sentence. Nothing else."""
         )
 
         if not completion:
@@ -128,28 +135,25 @@ class YouTube:
             script (str): The script of the video.
         """
         sentence_length = get_script_sentence_length()
-        prompt = f"""
-        You are a warm, calming life coach creating a short guided video script.
-        Write a script of exactly {sentence_length} sentences about the subject below.
+        prompt = f"""You are a profound philosophical narrator in the style of Jung Thoughts YouTube channel.
+Write a script of exactly {sentence_length} sentences about the subject below.
 
-        The tone must be:
-        - Warm, personal, and human — speak directly to the viewer as "you"
-        - Slow-paced and calming, like a guided meditation or coaching session
-        - Include one gentle interactive instruction the viewer can do right now, such as:
-          "Close your eyes and take a deep breath", "Place your hand on your heart",
-          "Repeat after me", "Take a moment to imagine", "Breathe in slowly"
-        - End with an uplifting, empowering statement
+Tone:
+- Deep, contemplative, intellectual — like a wise voice revealing hidden truths
+- Speak directly to the viewer as "you" with gravitas
+- Reference psychology or spiritual concepts naturally (Jung, shadow, awakening, healing)
+- Open with a provocative, thought-provoking statement
+- Build to a deep insight that makes the viewer pause
+- End with a powerful, haunting conclusion
 
-        Rules:
-        - Exactly {sentence_length} sentences, each sentence easy to speak aloud slowly
-        - NO markdown, NO titles, NO bullet points, NO headers
-        - NO meta-commentary about the script itself
-        - NO "welcome" or "in this video" openings
-        - Write only the raw spoken words, nothing else
-        - Language: {self.language}
+Rules:
+- Exactly {sentence_length} sentences
+- NO markdown, NO titles, NO bullet points
+- NO "welcome to" or "in this video" openings
+- Write only raw spoken words — dark, cinematic, intellectual tone
+- Language: {self.language}
 
-        Subject: {self.subject}
-        """
+Subject: {self.subject}"""
         completion = self.generate_response(prompt)
 
         # Apply regex to remove *
@@ -176,7 +180,12 @@ class YouTube:
             metadata (dict): The generated metadata.
         """
         title = self.generate_response(
-            f"Please generate a YouTube Video Title for the following subject, including hashtags: {self.subject}. Only return the title, nothing else. Limit the title under 100 characters."
+            f"""Generate a YouTube video title for the following subject.
+Style: Jung Thoughts channel — use formats like:
+"What X Really Becomes", "X's Uncomfortable Truth", "The Hidden Truth About X", "Why X – A Warning"
+Include 2-3 hashtags like #Psychology #JungThoughts #Spirituality
+Only return the title. Under 100 characters.
+Subject: {self.subject}"""
         )
 
         if len(title) > 100:
@@ -249,11 +258,11 @@ Subject: {self.subject}"""
             if get_verbose():
                 warning("Using fallback image prompts.")
             image_prompts = [
-                f"peaceful {self.subject} scene with warm golden light",
-                f"inspiring {self.subject} meditation landscape",
-                f"serene {self.subject} nature background",
-                f"calming {self.subject} sunrise visualization",
-                f"uplifting {self.subject} spiritual energy",
+                f"dark cinematic scene, {self.subject}, dramatic chiaroscuro lighting, moody atmosphere, 8k",
+                f"lone silhouette against stormy dramatic sky, {self.subject} concept, ethereal and haunting",
+                f"ancient misty forest with mystical light shafts, philosophical depth, {self.subject}",
+                f"person in deep contemplation, shadows and golden light, psychological tension, {self.subject}",
+                f"cosmic starfield with lone figure, existential depth, {self.subject} symbolism, cinematic",
             ]
 
         image_prompts = image_prompts[:n_prompts]

@@ -33,7 +33,22 @@ class Instagram:
                 if get_verbose():
                     warning(f"Instagram: could not load session ({e}), logging in fresh.")
 
-        cl.login(self.username, self.password)
+        try:
+            cl.login(self.username, self.password)
+        except Exception as e:
+            # Import here to avoid circular issues at module load
+            try:
+                from instagrapi.exceptions import ChallengeRequired, BadPassword
+                if isinstance(e, ChallengeRequired):
+                    warning("Instagram: challenge required — INSTAGRAM_SESSION_JSON may be expired. "
+                            "Re-run scripts/gen_instagram_session.py locally and update the secret.")
+                elif isinstance(e, BadPassword):
+                    warning("Instagram: bad password — check INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD secrets.")
+                else:
+                    warning(f"Instagram: login failed — {e}")
+            except ImportError:
+                warning(f"Instagram: login failed — {e}")
+            raise
         return cl
 
     def upload_reel(self, video_path: str, caption: str) -> str:
