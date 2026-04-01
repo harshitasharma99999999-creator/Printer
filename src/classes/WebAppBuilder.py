@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import re
@@ -7,7 +8,10 @@ import tempfile
 
 import requests
 
-from config import ROOT_DIR, get_verbose
+from config import (
+    ROOT_DIR, get_verbose,
+    get_nanobanana2_api_key, get_nanobanana2_api_base_url, get_nanobanana2_model,
+)
 from llm_provider import generate_text
 from status import error, info, success, warning
 
@@ -110,6 +114,114 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             info(f"App config: {config['app_name']} — {config['tagline']}")
         return config
 
+    def generate_icons(self, app_dir: str, app_name: str, tagline: str) -> str:
+        """Generate 512×192 app icons via Gemini image API. Returns theme_color hex."""
+        from PIL import Image
+        import io
+
+        api_key = get_nanobanana2_api_key()
+        if not api_key:
+            if get_verbose():
+                warning("Gemini API key not set — skipping icon generation, using placeholder icons.")
+            return "#7c3aed"
+
+        base_url = get_nanobanana2_api_base_url().rstrip("/")
+        model = get_nanobanana2_model()
+        endpoint = f"{base_url}/models/{model}:generateContent"
+
+        prompt = (
+            f"App icon for a SaaS web app called '{app_name}'. "
+            f"Theme: {tagline}. "
+            "Flat design, bold vibrant colors, clean simple symbol in center, "
+            "white background, NO text, NO letters. Square format, professional modern look."
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"],
+                "imageConfig": {"aspectRatio": "1:1"},
+            },
+        }
+
+        image_bytes = None
+        try:
+            resp = requests.post(
+                endpoint,
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+                timeout=120,
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            for candidate in body.get("candidates", []):
+                for part in candidate.get("content", {}).get("parts", []):
+                    inline = part.get("inlineData") or part.get("inline_data")
+                    if inline and str(inline.get("mimeType", "")).startswith("image/"):
+                        image_bytes = base64.b64decode(inline["data"])
+                        break
+                if image_bytes:
+                    break
+        except Exception as e:
+            if get_verbose():
+                warning(f"Icon generation API error: {e}")
+
+        if not image_bytes:
+            if get_verbose():
+                warning("No icon returned by Gemini — using placeholder.")
+            return "#7c3aed"
+
+        public_dir = os.path.join(app_dir, "public")
+        os.makedirs(public_dir, exist_ok=True)
+
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+        img.resize((512, 512), Image.LANCZOS).save(os.path.join(public_dir, "icon-512.png"))
+        img.resize((192, 192), Image.LANCZOS).save(os.path.join(public_dir, "icon-192.png"))
+
+        # Extract dominant color for theme_color
+        pixels = list(img.resize((50, 50)).convert("RGB").getdata())
+        avg_r = sum(p[0] for p in pixels) // len(pixels)
+        avg_g = sum(p[1] for p in pixels) // len(pixels)
+        avg_b = sum(p[2] for p in pixels) // len(pixels)
+        theme_color = f"#{avg_r:02x}{avg_g:02x}{avg_b:02x}"
+
+        if get_verbose():
+            info(f"Icons generated. Theme color: {theme_color}")
+        return theme_color
+
+    def _get_android_fingerprint(self) -> str:
+        """Decode keystore from env and return its SHA-256 certificate fingerprint."""
+        keystore_b64 = os.environ.get("ANDROID_KEYSTORE_BASE64", "").strip()
+        keystore_password = os.environ.get("ANDROID_KEYSTORE_PASSWORD", "").strip()
+        key_alias = os.environ.get("ANDROID_KEY_ALIAS", "appkey").strip()
+
+        if not keystore_b64 or not keystore_password:
+            return "PLACEHOLDER"
+
+        keystore_path = os.path.join(tempfile.gettempdir(), "android_release.keystore")
+        with open(keystore_path, "wb") as f:
+            f.write(base64.b64decode(keystore_b64))
+
+        try:
+            result = subprocess.run(
+                [
+                    "keytool", "-list", "-v",
+                    "-keystore", keystore_path,
+                    "-alias", key_alias,
+                    "-storepass", keystore_password,
+                    "-noprompt",
+                ],
+                capture_output=True, text=True, timeout=30,
+            )
+            for line in result.stdout.splitlines():
+                if "SHA256:" in line:
+                    return line.split("SHA256:")[-1].strip()
+            if get_verbose():
+                warning(f"keytool did not output SHA256. Output: {result.stdout[:500]}")
+        except Exception as e:
+            if get_verbose():
+                warning(f"keytool failed: {e}")
+        return "PLACEHOLDER"
+
     def build_app(self, config: dict) -> str:
         work_dir = os.path.join(tempfile.gettempdir(), f"webapp-{config['app_slug']}")
         if os.path.exists(work_dir):
@@ -119,6 +231,16 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         features = config.get("features", [])
         while len(features) < 3:
             features.append({"name": "Feature", "desc": "Coming soon"})
+
+        # Generate icons and extract theme color
+        theme_color = self.generate_icons(work_dir, config["app_name"], config["tagline"])
+        config["theme_color"] = theme_color
+
+        # Compute Android package name and fingerprint
+        safe_slug = re.sub(r"[^a-z0-9]", "", config["app_slug"].lower().replace("-", ""))
+        package_name = f"com.moneyprinter.{safe_slug}"
+        config["package_name"] = package_name
+        fingerprint = self._get_android_fingerprint()
 
         replacements = {
             "__APP_NAME__": config["app_name"],
@@ -133,6 +255,9 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             "__FEATURE_3_DESC__": features[2]["desc"],
             "__PRICE_MONTHLY__": str(int(config.get("price_monthly", 9))),
             "__PRICE_YEARLY__": str(int(config.get("price_yearly", 79))),
+            "__THEME_COLOR__": theme_color,
+            "__PACKAGE_NAME__": package_name,
+            "__FINGERPRINT__": fingerprint,
         }
 
         for root, _, files in os.walk(work_dir):
@@ -230,6 +355,200 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         success(f"Deployed to {base_url}")
         return base_url
 
+    def build_twa(self, app_dir: str, config: dict, deploy_url: str) -> str | None:
+        """Build a signed Android TWA (AAB) using Bubblewrap CLI."""
+        keystore_b64 = os.environ.get("ANDROID_KEYSTORE_BASE64", "").strip()
+        keystore_password = os.environ.get("ANDROID_KEYSTORE_PASSWORD", "").strip()
+        key_alias = os.environ.get("ANDROID_KEY_ALIAS", "appkey").strip()
+        key_password = os.environ.get("ANDROID_KEY_PASSWORD", keystore_password).strip()
+
+        if not keystore_b64 or not keystore_password:
+            if get_verbose():
+                warning("Android keystore secrets not set — skipping TWA build.")
+            return None
+
+        twa_dir = os.path.join(tempfile.gettempdir(), f"twa-{config['app_slug']}")
+        os.makedirs(twa_dir, exist_ok=True)
+
+        # Write keystore file
+        keystore_path = os.path.join(twa_dir, "release.keystore")
+        with open(keystore_path, "wb") as f:
+            f.write(base64.b64decode(keystore_b64))
+
+        domain = deploy_url.replace("https://", "").replace("http://", "").rstrip("/")
+        package_name = config.get("package_name", f"com.moneyprinter.{re.sub(r'[^a-z0-9]', '', config['app_slug'].lower())}")
+        theme_color = config.get("theme_color", "#7c3aed")
+
+        # Read fingerprint from already-written assetlinks.json (filled in build_app)
+        assetlinks_path = os.path.join(app_dir, "public", ".well-known", "assetlinks.json")
+        fingerprint = "PLACEHOLDER"
+        if os.path.exists(assetlinks_path):
+            with open(assetlinks_path) as f:
+                content = f.read()
+            m = re.search(r'"sha256_cert_fingerprints":\s*\["([^"]+)"', content)
+            if m:
+                fingerprint = m.group(1)
+
+        # Build twa-manifest.json for Bubblewrap
+        twa_manifest = {
+            "packageId": package_name,
+            "host": domain,
+            "name": config["app_name"],
+            "launcherName": config["app_name"][:12],
+            "display": "standalone",
+            "orientation": "default",
+            "themeColor": theme_color,
+            "navigationColor": theme_color,
+            "navigationColorDark": theme_color,
+            "navigationDividerColor": "#ffffff",
+            "navigationDividerColorDark": "#cccccc",
+            "backgroundColor": "#ffffff",
+            "enableNotifications": False,
+            "startUrl": "/",
+            "iconUrl": f"https://{domain}/icon-512.png",
+            "maskableIconUrl": f"https://{domain}/icon-512.png",
+            "splashScreenFadeOutDuration": 300,
+            "signingKey": {"path": keystore_path, "alias": key_alias},
+            "appVersionCode": 1,
+            "appVersion": "1.0.0",
+            "shortcuts": [],
+            "generatorApp": "bubblewrap-cli",
+            "webManifestUrl": f"https://{domain}/manifest.json",
+            "isChromeOSOnly": False,
+            "isMetaQuest": False,
+            "fullScopeUrl": f"https://{domain}/",
+            "minSdkVersion": 19,
+            "fingerprints": [{"name": "release", "value": fingerprint}],
+            "enableSiteSettingsShortcut": True,
+            "isSplashScreenEnabled": True,
+            "useBrowserOnChromeOS": False,
+            "features": {},
+        }
+
+        twa_manifest_path = os.path.join(twa_dir, "twa-manifest.json")
+        with open(twa_manifest_path, "w") as f:
+            json.dump(twa_manifest, f, indent=2)
+
+        if get_verbose():
+            info(f"Running bubblewrap build in {twa_dir}...")
+
+        try:
+            result = subprocess.run(
+                ["bubblewrap", "build", "--skipPwaValidation"],
+                cwd=twa_dir,
+                capture_output=True,
+                text=True,
+                timeout=600,
+                env={
+                    **os.environ,
+                    "KEYSTORE_PASSWORD": keystore_password,
+                    "KEY_PASSWORD": key_password,
+                },
+            )
+            if get_verbose():
+                print(result.stdout[-2000:])
+                if result.stderr:
+                    print(result.stderr[-1000:])
+        except Exception as e:
+            if get_verbose():
+                warning(f"Bubblewrap build failed: {e}")
+            return None
+
+        # Find signed AAB
+        aab_path = os.path.join(twa_dir, "app-release-signed.aab")
+        if not os.path.exists(aab_path):
+            for root, _, files in os.walk(twa_dir):
+                for fname in files:
+                    if fname.endswith(".aab"):
+                        aab_path = os.path.join(root, fname)
+                        break
+
+        if os.path.exists(aab_path):
+            success(f"TWA AAB built: {aab_path}")
+            return aab_path
+
+        if get_verbose():
+            warning("Bubblewrap build did not produce an AAB.")
+        return None
+
+    def publish_to_play_store(self, aab_path: str, config: dict) -> bool:
+        """Upload signed AAB to Google Play internal testing track."""
+        service_account_json = os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON", "").strip()
+        if not service_account_json:
+            if get_verbose():
+                warning("PLAY_STORE_SERVICE_ACCOUNT_JSON not set — skipping Play Store publish.")
+            return False
+        if not aab_path or not os.path.exists(aab_path):
+            if get_verbose():
+                warning("AAB file not found — skipping Play Store publish.")
+            return False
+
+        package_name = config.get("package_name", f"com.moneyprinter.{re.sub(r'[^a-z0-9]', '', config['app_slug'].lower())}")
+
+        try:
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build as google_build
+            from googleapiclient.http import MediaFileUpload
+
+            credentials = service_account.Credentials.from_service_account_info(
+                json.loads(service_account_json),
+                scopes=["https://www.googleapis.com/auth/androidpublisher"],
+            )
+            service = google_build("androidpublisher", "v3", credentials=credentials)
+            edits = service.edits()
+
+            # Create edit session
+            edit = edits.insert(packageName=package_name, body={}).execute()
+            edit_id = edit["id"]
+            if get_verbose():
+                info(f"Play Store edit created: {edit_id}")
+
+            # Upload AAB
+            media = MediaFileUpload(aab_path, mimetype="application/octet-stream")
+            bundle = edits.bundles().upload(
+                packageName=package_name,
+                editId=edit_id,
+                media_body=media,
+            ).execute()
+            version_code = bundle["versionCode"]
+            if get_verbose():
+                info(f"AAB uploaded, version code: {version_code}")
+
+            # Assign to internal testing track
+            edits.tracks().update(
+                packageName=package_name,
+                editId=edit_id,
+                track="internal",
+                body={"releases": [{"versionCodes": [str(version_code)], "status": "completed"}]},
+            ).execute()
+
+            # Set store listing
+            short_desc = config["tagline"][:80]
+            full_desc = f"{config['description']}\n\nFeatures:\n" + "\n".join(
+                f"• {f['name']}: {f['desc']}" for f in config.get("features", [])
+            )
+            edits.listings().update(
+                packageName=package_name,
+                editId=edit_id,
+                language="en-US",
+                body={
+                    "language": "en-US",
+                    "title": config["app_name"][:50],
+                    "shortDescription": short_desc,
+                    "fullDescription": full_desc[:4000],
+                },
+            ).execute()
+
+            # Commit edit
+            edits.commit(packageName=package_name, editId=edit_id).execute()
+            success(f"Published to Play Store internal track: {package_name}")
+            return True
+
+        except Exception as e:
+            if get_verbose():
+                warning(f"Play Store publish failed: {e}")
+            return False
+
     def tweet_launch(self, config: dict, url: str) -> bool:
         """Post a launch tweet via Twitter API v2 (OAuth 1.0a)."""
         api_key = os.environ.get("TWITTER_API_KEY", "").strip()
@@ -255,7 +574,6 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             f"Try it FREE 👉 {url}\n\n"
             f"#SaaS #startup #indiehacker #buildinpublic #AI"
         )
-        # Trim to 280 chars if needed
         if len(tweet) > 280:
             tweet = tweet[:277] + "..."
 
@@ -304,6 +622,14 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         url = self.deploy(app_dir, config)
         self.print_marketing_plan(config, url)
         self.tweet_launch(config, url)
+
+        # Build Android TWA and publish to Play Store if secrets are configured
+        if os.environ.get("ANDROID_KEYSTORE_BASE64") and os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON"):
+            aab_path = self.build_twa(app_dir, config, url)
+            if aab_path:
+                self.publish_to_play_store(aab_path, config)
+        elif get_verbose():
+            info("Android secrets not set — skipping TWA build and Play Store publish.")
 
         success(f"Done! App live at: {url}")
         return url
