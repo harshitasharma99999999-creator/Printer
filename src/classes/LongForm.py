@@ -97,18 +97,22 @@ class LongForm:
     def generate_script(self) -> str:
         parts = []
 
-        # Hook
+        # Hook — SCROLL-STOPPING, commanding male narrator energy
         hook = generate_text(
-            f"Write a powerful 4-sentence opening hook for a YouTube video about: {self.subject}.\n"
-            f"Start with a shocking statement or question that makes viewers freeze.\n"
-            f"Speak directly to the viewer as 'you'. Language: {self.language}.\n"
-            f"NO titles, NO markdown. Raw spoken words only."
+            f"Write a 4-sentence EXPLOSIVE opening hook for a YouTube video about: {self.subject}.\n"
+            f"You are a deep, commanding male voice — authoritative, dark, unflinching.\n"
+            f"Sentence 1: A SHOCKING statement that makes the viewer freeze — no warm-up, straight to the truth.\n"
+            f"Sentence 2: Challenge what they think they know.\n"
+            f"Sentence 3: Speak directly to the viewer as 'you' — make it personal and urgent.\n"
+            f"Sentence 4: Promise the devastating insight they're about to receive.\n"
+            f"Language: {self.language}. NO titles, NO markdown. Raw spoken words only."
         ).strip()
         parts.append(hook)
 
         # Section outline
         outline_raw = generate_text(
-            f"List exactly 5 section titles for a 12-minute YouTube video about: {self.subject}.\n"
+            f"List exactly 5 dark, powerful section titles for a 12-minute YouTube video about: {self.subject}.\n"
+            f"Style: Jung Thoughts channel — philosophical, psychological, uncomfortable truths.\n"
             f"Format: numbered list 1-5. No explanations."
         ).strip()
         section_titles = []
@@ -125,20 +129,23 @@ class LongForm:
                 "What Changes When You Know This",
             ]
 
-        # Each section body
+        # Each section body — powerful masculine narrator
         for title in section_titles[:5]:
             section = generate_text(
-                f"Write 6 engaging spoken sentences for the section titled '{title}' "
+                f"Write 6 powerful spoken sentences for the section '{title}' "
                 f"in a video about: {self.subject}.\n"
-                f"Tone: authoritative, warm, speaks to viewer as 'you'.\n"
+                f"Tone: deep, commanding, masculine — like a wise elder revealing hidden truths.\n"
+                f"Speak to the viewer as 'you' with authority. Include psychological insight or Jungian depth.\n"
+                f"Mix short punchy sentences with longer profound ones.\n"
                 f"Language: {self.language}. NO markdown, NO headers. Raw spoken words only."
             ).strip()
             parts.append(section)
 
-        # CTA
+        # CTA — strong and direct
         cta = generate_text(
-            f"Write a warm 3-sentence call to action for a YouTube video about: {self.subject}.\n"
-            f"Ask viewers to like, comment with their thoughts, and subscribe.\n"
+            f"Write a 3-sentence powerful closing for a YouTube video about: {self.subject}.\n"
+            f"Tone: commanding, direct — challenge the viewer to act.\n"
+            f"Ask them to like, share their truth in the comments, and subscribe for more.\n"
             f"Language: {self.language}. Raw spoken words only."
         ).strip()
         parts.append(cta)
@@ -229,9 +236,11 @@ class LongForm:
 
     def generate_image_prompts(self) -> List[str]:
         raw = generate_text(
-            f"Generate 8 vivid cinematic image prompts for a YouTube video about: {self.subject}.\n"
-            f"Each prompt = one detailed 16:9 landscape scene. Style: dark, dramatic, emotional.\n"
-            f"Return as JSON array of strings only. Example: [\"scene1\", \"scene2\"]"
+            f"Generate 8 CINEMATIC 16:9 image prompts for a dark psychological YouTube video about: {self.subject}.\n"
+            f"Style: epic movie-quality, dark and dramatic, hyper-realistic, emotional power.\n"
+            f"Use: lone figures in vast landscapes, dramatic chiaroscuro lighting, stormy skies,\n"
+            f"extreme close-ups of eyes/hands, symbolic imagery, apocalyptic beauty.\n"
+            f"Return as JSON array of 8 strings only. Example: [\"scene1\", \"scene2\"]"
         ).strip()
         m = re.search(r"\[.*?\]", raw, re.DOTALL)
         if m:

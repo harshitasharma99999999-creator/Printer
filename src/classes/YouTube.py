@@ -135,22 +135,23 @@ Return ONLY the video topic as one sentence. Nothing else."""
             script (str): The script of the video.
         """
         sentence_length = get_script_sentence_length()
-        prompt = f"""You are a profound philosophical narrator in the style of Jung Thoughts YouTube channel.
+        prompt = f"""You are a deep, authoritative male narrator — commanding, dark, and profound.
 Write a script of exactly {sentence_length} sentences about the subject below.
 
 Tone:
-- Deep, contemplative, intellectual — like a wise voice revealing hidden truths
-- Speak directly to the viewer as "you" with gravitas
-- Reference psychology or spiritual concepts naturally (Jung, shadow, awakening, healing)
-- Open with a provocative, thought-provoking statement
-- Build to a deep insight that makes the viewer pause
-- End with a powerful, haunting conclusion
+- POWERFUL masculine voice — like a wise elder revealing uncomfortable truths
+- Speak directly to the viewer as "you" with absolute authority and gravitas
+- Reference Jungian psychology, shadow work, or spiritual awakening naturally
+- FIRST SENTENCE must be an immediate SCROLL-STOPPING statement — shocking, provocative, makes the viewer freeze
+- Build intensity sentence by sentence toward a devastating insight
+- End with a haunting truth the viewer cannot unhear
 
 Rules:
 - Exactly {sentence_length} sentences
 - NO markdown, NO titles, NO bullet points
-- NO "welcome to" or "in this video" openings
-- Write only raw spoken words — dark, cinematic, intellectual tone
+- NO "welcome to" or "in this video" openings — START with the punch
+- Raw spoken words only — forceful, dark, cinematic, masculine energy
+- Short punchy sentences mixed with deep powerful ones
 - Language: {self.language}
 
 Subject: {self.subject}"""
@@ -218,9 +219,12 @@ Subject: {self.subject}"""
         """
         n_prompts = 5
 
-        prompt = f"""Generate exactly {n_prompts} image prompts for AI image generation about the subject below.
-Return ONLY a JSON array of {n_prompts} strings, nothing else. No explanation, no markdown.
-Example: ["prompt one", "prompt two", "prompt three", "prompt four", "prompt five"]
+        prompt = f"""Generate exactly {n_prompts} SCROLL-STOPPING cinematic image prompts for a dark psychological YouTube Short.
+Each prompt must be visually STRIKING enough to make someone stop scrolling instantly.
+Style: hyper-realistic, cinematic, dramatic lighting, emotional intensity — like a movie poster.
+Use extreme close-ups, lone figures in vast landscapes, dramatic light/shadow contrast, surreal imagery.
+Return ONLY a JSON array of {n_prompts} strings, nothing else.
+Example: ["extreme close-up...", "lone silhouette...", "cracked earth..."]
 
 Subject: {self.subject}"""
 
@@ -254,15 +258,15 @@ Subject: {self.subject}"""
                 if get_verbose():
                     warning("Failed to parse image prompts. Retrying...")
                 return self.generate_prompts(_retries=_retries + 1)
-            # Fallback: generate simple prompts from subject
+            # Fallback: scroll-stopping cinematic prompts
             if get_verbose():
                 warning("Using fallback image prompts.")
             image_prompts = [
-                f"dark cinematic scene, {self.subject}, dramatic chiaroscuro lighting, moody atmosphere, 8k",
-                f"lone silhouette against stormy dramatic sky, {self.subject} concept, ethereal and haunting",
-                f"ancient misty forest with mystical light shafts, philosophical depth, {self.subject}",
-                f"person in deep contemplation, shadows and golden light, psychological tension, {self.subject}",
-                f"cosmic starfield with lone figure, existential depth, {self.subject} symbolism, cinematic",
+                f"extreme close-up of a single human eye reflecting storm clouds, tears forming, hyper-realistic, {self.subject}, 8k cinematic",
+                f"lone dark silhouette of a man standing at the edge of a cliff, apocalyptic red sky, lightning, {self.subject}, ultra dramatic",
+                f"cracked earth stretching to the horizon, single figure walking away, scorching light behind, {self.subject}, cinematic desolation",
+                f"man's face half-submerged in dark water, intense gaze upward, chiaroscuro, {self.subject}, psychological tension 8k",
+                f"ancient stone corridor with blinding light at the end, lone shadow walking toward it, {self.subject}, epic cinematic composition",
             ]
 
         image_prompts = image_prompts[:n_prompts]
