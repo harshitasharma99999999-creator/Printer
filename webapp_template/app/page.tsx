@@ -64,7 +64,17 @@ export default function Home() {
           <h1 className="text-5xl sm:text-6xl font-extrabold text-gray-900 leading-tight mb-6">
             {TAGLINE}
           </h1>
-          <p className="text-xl text-gray-500 mb-10 leading-relaxed">{DESCRIPTION}</p>
+          <p className="text-xl text-gray-500 mb-8 leading-relaxed">{DESCRIPTION}</p>
+
+          <div className="mb-6">
+            <a
+              href="/tool"
+              className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl px-8 py-3 text-base transition-colors"
+            >
+              Try it free →
+            </a>
+            <p className="mt-2 text-sm text-gray-400">No sign-up needed · 3 free uses</p>
+          </div>
 
           <form onSubmit={handleCheckout} className="flex flex-col sm:flex-row gap-3 justify-center">
             <input

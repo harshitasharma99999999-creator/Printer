@@ -71,7 +71,7 @@ class WebAppBuilder:
 Reddit demand signals (people asking for tools/apps):
 {posts_text}
 
-Pick the SINGLE BEST niche and design a simple SaaS MVP landing page.
+Pick the SINGLE BEST niche and design a simple SaaS MVP that includes a real AI-powered tool.
 Return ONLY a valid JSON object, no markdown, no explanation:
 {{
   "app_name": "2-3 word product name",
@@ -87,7 +87,15 @@ Return ONLY a valid JSON object, no markdown, no explanation:
   "price_yearly": 79,
   "target_subreddit": "best subreddit to post launch announcement",
   "reddit_post_title": "Show HN style launch post title",
-  "reddit_post_body": "2-3 paragraph post: describe the problem, the solution, and invite feedback. Include a call to action."
+  "reddit_post_body": "2-3 paragraph post: describe the problem, the solution, and invite feedback. Include a call to action.",
+  "tool_title": "Action verb phrase describing what the tool does (e.g. Write your cold email instantly)",
+  "tool_description": "One sentence telling the user exactly what to enter to get their result",
+  "input_1_label": "Short label for the first input field (e.g. Company Name)",
+  "input_1_placeholder": "Realistic example value for input 1",
+  "input_2_label": "Short label for the second input field (e.g. Your role or context)",
+  "input_2_placeholder": "Realistic example value for input 2",
+  "output_label": "What the generated result is called (e.g. Your Cold Email)",
+  "tool_prompt": "A Gemini AI prompt that uses {{input1}} and {{input2}} as placeholders and produces a high-quality immediately useful result. Be specific and detailed."
 }}"""
 
         response = generate_text(prompt)
@@ -258,6 +266,14 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             "__THEME_COLOR__": theme_color,
             "__PACKAGE_NAME__": package_name,
             "__FINGERPRINT__": fingerprint,
+            "__TOOL_TITLE__": config.get("tool_title", f"Generate with {config['app_name']}"),
+            "__TOOL_DESCRIPTION__": config.get("tool_description", "Enter your details below to get an instant AI-generated result."),
+            "__INPUT_1_LABEL__": config.get("input_1_label", "Input"),
+            "__INPUT_1_PLACEHOLDER__": config.get("input_1_placeholder", "Enter your input here..."),
+            "__INPUT_2_LABEL__": config.get("input_2_label", "Additional context (optional)"),
+            "__INPUT_2_PLACEHOLDER__": config.get("input_2_placeholder", "Add any extra context..."),
+            "__OUTPUT_LABEL__": config.get("output_label", "Your Result"),
+            "__TOOL_PROMPT__": config.get("tool_prompt", f"You are an expert assistant for {config['app_name']}. The user provided: {{input1}}. Additional context: {{input2}}. Provide a detailed, high-quality response that directly solves their problem."),
         }
 
         for root, _, files in os.walk(work_dir):
@@ -350,6 +366,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             "DODO_API_KEY": dodo_api_key,
             "DODO_PRODUCT_ID": dodo_product_id,
             "NEXT_PUBLIC_BASE_URL": base_url,
+            "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY", ""),
         })
 
         success(f"Deployed to {base_url}")

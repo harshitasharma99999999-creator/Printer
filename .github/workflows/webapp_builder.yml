@@ -85,6 +85,7 @@ jobs:
       - name: Run Web App Builder
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DODO_API_KEY: ${{ secrets.DODO_API_KEY }}
           DODO_PRODUCT_ID: ${{ secrets.DODO_PRODUCT_ID }}
