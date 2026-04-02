@@ -28,3 +28,4 @@ google-auth-oauthlib
 instagrapi
 pyotp
 tweepy
+praw

@@ -566,49 +566,108 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                 warning(f"Play Store publish failed: {e}")
             return False
 
-    def tweet_launch(self, config: dict, url: str) -> bool:
-        """Post a launch tweet via Twitter API v2 (OAuth 1.0a)."""
+    def _get_twitter_client(self):
+        """Return authenticated tweepy.Client or None if credentials missing."""
         api_key = os.environ.get("TWITTER_API_KEY", "").strip()
         api_secret = os.environ.get("TWITTER_API_SECRET", "").strip()
         access_token = os.environ.get("TWITTER_ACCESS_TOKEN", "").strip()
         access_token_secret = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET", "").strip()
-
         if not all([api_key, api_secret, access_token, access_token_secret]):
             if get_verbose():
-                warning("Twitter API credentials not set — skipping tweet. "
-                        "Set TWITTER_API_KEY, TWITTER_API_SECRET, "
-                        "TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET secrets.")
+                warning("Twitter API credentials not set — skipping Twitter marketing.")
+            return None
+        import tweepy
+        return tweepy.Client(
+            consumer_key=api_key,
+            consumer_secret=api_secret,
+            access_token=access_token,
+            access_token_secret=access_token_secret,
+        )
+
+    def tweet_launch(self, config: dict, url: str) -> bool:
+        """Post a launch thread (3 tweets) via Twitter API v2."""
+        client = self._get_twitter_client()
+        if not client:
             return False
 
         features = config.get("features", [])
-        feat_lines = "\n".join(
-            f"✅ {f['name']}" for f in features[:3]
+
+        # Tweet 1 — hook + link
+        t1 = (
+            f"🚀 Just shipped {config['app_name']} — {config['tagline']}\n\n"
+            f"Try it FREE (3 uses, no sign-up) 👉 {url}\n\n"
+            f"#SaaS #buildinpublic #indiehacker #AI"
         )
-        tweet = (
-            f"🚀 Just launched {config['app_name']}!\n\n"
-            f"{config['tagline']}\n\n"
-            f"{feat_lines}\n\n"
-            f"Try it FREE 👉 {url}\n\n"
-            f"#SaaS #startup #indiehacker #buildinpublic #AI"
+        if len(t1) > 280:
+            t1 = t1[:277] + "..."
+
+        # Tweet 2 — features (reply to t1 to form thread)
+        feat_lines = "\n".join(f"✅ {f['name']} — {f['desc']}" for f in features[:3])
+        t2 = f"What it does:\n\n{feat_lines}\n\nBuilt in 24h with AI 🤖"
+        if len(t2) > 280:
+            t2 = t2[:277] + "..."
+
+        # Tweet 3 — pricing CTA
+        price = config.get("price_monthly", 9)
+        t3 = (
+            f"Pricing: ${price}/mo after your 3 free uses.\n\n"
+            f"If you find it useful, RT to help others find it 🙏\n\n"
+            f"{url}"
         )
-        if len(tweet) > 280:
-            tweet = tweet[:277] + "..."
+        if len(t3) > 280:
+            t3 = t3[:277] + "..."
 
         try:
-            import tweepy
-            client = tweepy.Client(
-                consumer_key=api_key,
-                consumer_secret=api_secret,
-                access_token=access_token,
-                access_token_secret=access_token_secret,
-            )
-            client.create_tweet(text=tweet)
+            r1 = client.create_tweet(text=t1)
+            t1_id = r1.data["id"]
+            client.create_tweet(text=t2, in_reply_to_tweet_id=t1_id)
+            r3 = client.create_tweet(text=t3, in_reply_to_tweet_id=t1_id)
             if get_verbose():
-                success(f"Tweet posted: {tweet[:80]}...")
+                success(f"Twitter thread posted (3 tweets). First tweet id: {t1_id}")
             return True
         except Exception as e:
             if get_verbose():
-                warning(f"Tweet failed: {e}")
+                warning(f"Twitter thread failed: {e}")
+            return False
+
+    def post_to_reddit(self, config: dict, url: str) -> bool:
+        """Post launch to Reddit using PRAW (Reddit API)."""
+        client_id = os.environ.get("REDDIT_CLIENT_ID", "").strip()
+        client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "").strip()
+        reddit_username = os.environ.get("REDDIT_USERNAME", "").strip()
+        reddit_password = os.environ.get("REDDIT_PASSWORD", "").strip()
+
+        if not all([client_id, client_secret, reddit_username, reddit_password]):
+            if get_verbose():
+                warning("Reddit credentials not set — skipping Reddit post. "
+                        "Set REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD.")
+            return False
+
+        try:
+            import praw
+            reddit = praw.Reddit(
+                client_id=client_id,
+                client_secret=client_secret,
+                username=reddit_username,
+                password=reddit_password,
+                user_agent=f"MoneyPrinterV2:webapp-launcher:1.0 (by /u/{reddit_username})",
+            )
+
+            subreddit_name = config.get("target_subreddit", "SideProject")
+            title = config.get("reddit_post_title", f"I built {config['app_name']} — {config['tagline']}")
+            body = config.get("reddit_post_body", config["description"])
+
+            # Append the URL naturally to the body
+            full_body = f"{body}\n\nLive now: {url}\n\nWould love feedback from this community!"
+
+            subreddit = reddit.subreddit(subreddit_name)
+            post = subreddit.submit(title=title[:300], selftext=full_body)
+            if get_verbose():
+                success(f"Reddit post live: https://reddit.com{post.permalink}")
+            return True
+        except Exception as e:
+            if get_verbose():
+                warning(f"Reddit post failed: {e}")
             return False
 
     def print_marketing_plan(self, config: dict, url: str):
@@ -638,7 +697,10 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         app_dir = self.build_app(config)
         url = self.deploy(app_dir, config)
         self.print_marketing_plan(config, url)
+
+        # Marketing — run all channels
         self.tweet_launch(config, url)
+        self.post_to_reddit(config, url)
 
         # Build Android TWA and publish to Play Store if secrets are configured
         if os.environ.get("ANDROID_KEYSTORE_BASE64") and os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON"):
