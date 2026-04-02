@@ -25,16 +25,19 @@ class Instagram:
         session_json = os.environ.get("INSTAGRAM_SESSION_JSON", "").strip()
         if session_json:
             try:
-                cl.load_settings(json.loads(session_json))
+                cl.set_settings(json.loads(session_json))
                 if get_verbose():
                     from status import info
-                    info("Instagram: loaded saved session.")
+                    info("Instagram: session settings injected.")
             except Exception as e:
                 if get_verbose():
                     warning(f"Instagram: could not load session ({e}), logging in fresh.")
 
         try:
             cl.login(self.username, self.password)
+            if get_verbose():
+                from status import info
+                info("Instagram: login successful.")
         except Exception as e:
             # Import here to avoid circular issues at module load
             try:
