@@ -378,6 +378,12 @@ class EBook:
 
     def format_pdf(self) -> str:
         """Generate a formatted PDF using reportlab. Returns file path."""
+        import re as _re
+
+        def _safe_para(text: str) -> str:
+            """Strip HTML tags that ReportLab can't parse (br, b, i, etc.)."""
+            # Remove all HTML tags — keeps plain text safe for Paragraph()
+            return _re.sub(r"<[^>]+>", "", text).strip()
         mp_dir = os.path.join(ROOT_DIR, ".mp")
         os.makedirs(mp_dir, exist_ok=True)
         path = os.path.join(mp_dir, f"ebook-{self.slug}.pdf")
@@ -443,7 +449,7 @@ class EBook:
         story.append(Paragraph("About This eBook", ch_title_style))
         for para in self.description.split("\n"):
             if para.strip():
-                story.append(Paragraph(para.strip(), body_style))
+                story.append(Paragraph(_safe_para(para.strip()), body_style))
         story.append(PageBreak())
 
         # Chapters
@@ -452,7 +458,7 @@ class EBook:
             story.append(Spacer(1, 0.1 * inch))
             for para in ch["body"].split("\n"):
                 if para.strip():
-                    story.append(Paragraph(para.strip(), body_style))
+                    story.append(Paragraph(_safe_para(para.strip()), body_style))
             story.append(PageBreak())
 
         # Final page — affiliate CTA
