@@ -2,8 +2,7 @@ name: YouTube Shorts
 
 on:
   schedule:
-    - cron: "0 4 * * *"   # 9:30 AM IST
-    - cron: "0 16 * * *"  # 9:30 PM IST
+    - cron: "0 */4 * * *"   # Every 4 hours: 12:30, 4:30, 8:30, 12:30, 16:30, 20:30 IST
   workflow_dispatch: {}
 
 jobs:

@@ -13,6 +13,6 @@ class TTS:
         self._voice = get_tts_voice()
 
     def synthesize(self, text, output_file=os.path.join(ROOT_DIR, ".mp", "audio.wav")):
-        audio = self._model.generate(text, voice=self._voice, speed=0.82)
+        audio = self._model.generate(text, voice=self._voice, speed=0.9)
         sf.write(output_file, audio, KITTEN_SAMPLE_RATE)
         return output_file
