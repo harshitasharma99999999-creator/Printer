@@ -630,6 +630,77 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                 warning(f"Twitter thread failed: {e}")
             return False
 
+    def post_to_devto(self, config: dict, url: str) -> bool:
+        """Publish a launch article to Dev.to."""
+        api_key = os.environ.get("DEVTO_API_KEY", "").strip()
+        if not api_key:
+            if get_verbose():
+                warning("DEVTO_API_KEY not set — skipping Dev.to post.")
+            return False
+
+        features = config.get("features", [])
+        feat_md = "\n".join(f"- **{f['name']}** — {f['desc']}" for f in features)
+        price = config.get("price_monthly", 9)
+        price_yearly = config.get("price_yearly", 79)
+
+        article_body = f"""I just shipped **{config['app_name']}** — {config['tagline']}
+
+## What it does
+
+{config['description']}
+
+## Features
+
+{feat_md}
+
+## Try it free
+
+👉 **[{url}]({url})**
+
+No sign-up needed. Get 3 free uses instantly, then ${price}/mo (or ${price_yearly}/yr).
+
+---
+
+Built this in 24 hours using AI. Would love feedback from the dev community!
+
+What would you add or improve? Drop a comment below 👇
+"""
+
+        tags = ["showdev", "webdev", "saas", "productivity"]
+
+        try:
+            resp = requests.post(
+                "https://dev.to/api/articles",
+                headers={
+                    "api-key": api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "article": {
+                        "title": f"I built {config['app_name']} — {config['tagline']}",
+                        "body_markdown": article_body,
+                        "published": True,
+                        "tags": tags,
+                        "canonical_url": url,
+                    }
+                },
+                timeout=30,
+            )
+            if resp.status_code in (200, 201):
+                data = resp.json()
+                article_url = data.get("url", "")
+                if get_verbose():
+                    success(f"Dev.to article published: {article_url}")
+                return True
+            else:
+                if get_verbose():
+                    warning(f"Dev.to post failed: {resp.status_code} {resp.text[:200]}")
+                return False
+        except Exception as e:
+            if get_verbose():
+                warning(f"Dev.to post failed: {e}")
+            return False
+
     def post_to_reddit(self, config: dict, url: str) -> bool:
         """Post launch to Reddit using PRAW (Reddit API)."""
         client_id = os.environ.get("REDDIT_CLIENT_ID", "").strip()
@@ -700,6 +771,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
 
         # Marketing — run all channels
         self.tweet_launch(config, url)
+        self.post_to_devto(config, url)
         self.post_to_reddit(config, url)
 
         # Build Android TWA and publish to Play Store if secrets are configured
