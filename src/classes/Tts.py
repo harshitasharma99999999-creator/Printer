@@ -13,6 +13,16 @@ class TTS:
         self._voice = get_tts_voice()
 
     def synthesize(self, text, output_file=os.path.join(ROOT_DIR, ".mp", "audio.wav")):
-        audio = self._model.generate(text, voice=self._voice, speed=0.9)
+        audio = self._model.generate(text, voice=self._voice, speed=0.85)
         sf.write(output_file, audio, KITTEN_SAMPLE_RATE)
+        # Post-process: bass boost + dynamic compression for dominant voice
+        import subprocess, shutil
+        tmp = output_file + ".tmp.wav"
+        result = subprocess.run([
+            "ffmpeg", "-y", "-i", output_file,
+            "-af", "equalizer=f=100:width_type=o:width=2:g=6,equalizer=f=200:width_type=o:width=2:g=3,acompressor=threshold=0.05:ratio=4:attack=5:release=50:makeup=3",
+            tmp
+        ], capture_output=True)
+        if result.returncode == 0:
+            shutil.move(tmp, output_file)
         return output_file

@@ -105,7 +105,8 @@ class LongForm:
             f"Sentence 2: Challenge what they think they know.\n"
             f"Sentence 3: Speak directly to the viewer as 'you' — make it personal and urgent.\n"
             f"Sentence 4: Promise the devastating insight they're about to receive.\n"
-            f"Language: {self.language}. NO titles, NO markdown. Raw spoken words only."
+            f"Language: {self.language}. NO titles, NO markdown. Raw spoken words only.\n"
+            f"Use YOU and YOUR constantly. Commands and declarations only — never suggestions."
         ).strip()
         parts.append(hook)
 
@@ -137,7 +138,8 @@ class LongForm:
                 f"Tone: deep, commanding, masculine — like a wise elder revealing hidden truths.\n"
                 f"Speak to the viewer as 'you' with authority. Include psychological insight or Jungian depth.\n"
                 f"Mix short punchy sentences with longer profound ones.\n"
-                f"Language: {self.language}. NO markdown, NO headers. Raw spoken words only."
+                f"Language: {self.language}. NO markdown, NO headers. Raw spoken words only.\n"
+                f"Use YOU and YOUR constantly. Commands and declarations only — never suggestions."
             ).strip()
             parts.append(section)
 

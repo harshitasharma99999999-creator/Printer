@@ -152,6 +152,8 @@ Rules:
 - NO "welcome to" or "in this video" openings — START with the punch
 - Raw spoken words only — forceful, dark, cinematic, masculine energy
 - Short punchy sentences mixed with deep powerful ones
+- Use YOU and YOUR constantly — direct address, never passive voice
+- Commands and declarations ONLY — never suggestions ("you must", "you are", "wake up", not "you might want to")
 - Language: {self.language}
 
 Subject: {self.subject}"""
