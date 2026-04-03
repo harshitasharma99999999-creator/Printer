@@ -1,0 +1,123 @@
+name: Content Distributor
+
+on:
+  schedule:
+    # Every 8 hours at :30 past the hour — offset from Shorts (which runs at :00)
+    - cron: "30 1,9,17 * * *"
+  workflow_dispatch: {}
+
+# Required for Podcast: creating GitHub Releases + pushing RSS feed
+permissions:
+  contents: write
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg imagemagick libjpeg-dev zlib1g-dev libpng-dev
+
+      - name: Fix ImageMagick security policy
+        run: |
+          sudo sed -i 's/rights="none" pattern="@\*"/rights="read|write" pattern="@*"/' /etc/ImageMagick-6/policy.xml || true
+          sudo sed -i 's/<policy domain="coder" rights="none" pattern="PDF"/<policy domain="coder" rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml || true
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create config.json
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "verbose": true,
+            "firefox_profile": "",
+            "headless": true,
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_model": "tinyllama",
+            "groq_api_key": "",
+            "groq_model": "llama-3.1-8b-instant",
+            "nanobanana2_api_base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "nanobanana2_api_key": "${{ secrets.GEMINI_API_KEY }}",
+            "nanobanana2_model": "gemini-2.5-flash-image",
+            "nanobanana2_aspect_ratio": "9:16",
+            "threads": 2,
+            "zip_url": "",
+            "is_for_kids": false,
+            "google_maps_scraper": "",
+            "email": {"smtp_server": "smtp.gmail.com", "smtp_port": 587, "username": "", "password": ""},
+            "google_maps_scraper_niche": "",
+            "scraper_timeout": 300,
+            "outreach_message_subject": "",
+            "outreach_message_body_file": "outreach_message.html",
+            "stt_provider": "local_whisper",
+            "whisper_model": "base",
+            "whisper_device": "auto",
+            "whisper_compute_type": "int8",
+            "assembly_ai_api_key": "",
+            "tts_voice": "Hugo",
+            "font": "bold_font.ttf",
+            "imagemagick_path": "/usr/bin/convert",
+            "script_sentence_length": 5,
+            "affiliate_link": "${{ secrets.AFFILIATE_LINK }}",
+            "gumroad_access_token": "",
+            "ebook_price": 4.99,
+            "ebook_author": "Harshita Sharma",
+            "kdp_firefox_profile": "",
+            "gumroad_firefox_profile": "",
+            "kdp_affiliate_link": "",
+            "kdp_email": "",
+            "kdp_password": ""
+          }
+          EOF
+
+      - name: Create .mp cache directory
+        run: mkdir -p .mp
+
+      - name: Configure git for podcast RSS pushes
+        run: |
+          git config user.email "ci@moneyprinter.io"
+          git config user.name "MoneyPrinterCI"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      - name: Run distributor pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # Medium
+          MEDIUM_INTEGRATION_TOKEN: ${{ secrets.MEDIUM_INTEGRATION_TOKEN }}
+          # Beehiiv Newsletter
+          BEEHIIV_API_KEY: ${{ secrets.BEEHIIV_API_KEY }}
+          BEEHIIV_PUBLICATION_ID: ${{ secrets.BEEHIIV_PUBLICATION_ID }}
+          # Pinterest
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          PINTEREST_BOARD_ID: ${{ secrets.PINTEREST_BOARD_ID }}
+          # Reddit
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
+          REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
+          # Hashnode
+          HASHNODE_ACCESS_TOKEN: ${{ secrets.HASHNODE_ACCESS_TOKEN }}
+          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+          # WhatsApp Business Cloud API
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_RECIPIENTS: ${{ secrets.WHATSAPP_RECIPIENTS }}
+          # Gumroad (printables + courses)
+          GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
+          # Affiliate
+          AFFILIATE_LINK: ${{ secrets.AFFILIATE_LINK }}
+        run: python src/distributor_runner.py
