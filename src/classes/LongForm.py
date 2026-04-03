@@ -76,10 +76,11 @@ class LongForm:
             f"You are a top YouTube creator in the '{self.niche}' niche.\n"
             f"Generate ONE specific, fascinating, clickable video topic for a 10-15 minute "
             f"long-form YouTube video about {self.niche}.\n"
-            f"The topic must be emotional, thought-provoking, and urgent.\n"
-            f"Examples: 'The Hidden Signs Someone Is Manipulating You', "
-            f"'Why You Attract Toxic People And How To Stop', "
-            f"'The Silent Power of Saying Nothing'\n"
+            f"The topic must be urgent, hypnotic, and make the viewer feel it speaks directly to them.\n"
+            f"Examples: 'Why Your Vibration Is Blocking Everything You Want (And How To Fix It Tonight)', "
+            f"'The Science Of Reality Shifting: How To Move Between Timelines', "
+            f"'Your Aura Color Reveals Exactly What The Universe Is Sending You', "
+            f"'The 5D Shift Is Happening NOW: Here Is What You Must Do'\n"
             f"Return ONLY the topic, nothing else."
         )
         raw = generate_text(prompt).strip()
@@ -99,12 +100,12 @@ class LongForm:
 
         # Hook — SCROLL-STOPPING, commanding male narrator energy
         hook = generate_text(
-            f"Write a 4-sentence EXPLOSIVE opening hook for a YouTube video about: {self.subject}.\n"
-            f"You are a deep, commanding male voice — authoritative, dark, unflinching.\n"
-            f"Sentence 1: A SHOCKING statement that makes the viewer freeze — no warm-up, straight to the truth.\n"
-            f"Sentence 2: Challenge what they think they know.\n"
-            f"Sentence 3: Speak directly to the viewer as 'you' — make it personal and urgent.\n"
-            f"Sentence 4: Promise the devastating insight they're about to receive.\n"
+            f"Write a 4-sentence EXPLOSIVE opening hook for a spiritual YouTube video about: {self.subject}.\n"
+            f"You are an energetic, hypnotic spiritual narrator — electric, fast, gripping.\n"
+            f"Sentence 1: A REALITY-SHATTERING statement about vibration or manifestation — makes the viewer freeze instantly.\n"
+            f"Sentence 2: Tell them something is happening to them RIGHT NOW that they don't see.\n"
+            f"Sentence 3: Speak directly as 'you' — make it personal, urgent, cosmic.\n"
+            f"Sentence 4: Promise the exact shift they're about to experience in the next few minutes.\n"
             f"Language: {self.language}. NO titles, NO markdown. Raw spoken words only.\n"
             f"Use YOU and YOUR constantly. Commands and declarations only — never suggestions."
         ).strip()
@@ -134,10 +135,10 @@ class LongForm:
         for title in section_titles[:5]:
             section = generate_text(
                 f"Write 6 powerful spoken sentences for the section '{title}' "
-                f"in a video about: {self.subject}.\n"
-                f"Tone: deep, commanding, masculine — like a wise elder revealing hidden truths.\n"
-                f"Speak to the viewer as 'you' with authority. Include psychological insight or Jungian depth.\n"
-                f"Mix short punchy sentences with longer profound ones.\n"
+                f"in a spiritual video about: {self.subject}.\n"
+                f"Tone: energetic, hypnotic, electric — like a frequency that locks the listener in.\n"
+                f"Speak to the viewer as 'you' with total conviction. Reference vibration, aura, manifestation, reality shifting.\n"
+                f"Mix rapid-fire truth bombs with longer hypnotic declarations.\n"
                 f"Language: {self.language}. NO markdown, NO headers. Raw spoken words only.\n"
                 f"Use YOU and YOUR constantly. Commands and declarations only — never suggestions."
             ).strip()

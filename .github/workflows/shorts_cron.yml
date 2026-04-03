@@ -78,7 +78,7 @@ jobs:
         run: |
           mkdir -p .mp
           cat > .mp/youtube.json << 'EOF'
-          {"accounts": [{"id": "944ff01c-c1ee-44f4-a59f-cb3f44b056c0", "nickname": "universe", "firefox_profile": "", "niche": "Carl Jung psychology empath shadow work spiritual awakening dark wisdom", "language": "english", "videos": []}]}
+          {"accounts": [{"id": "944ff01c-c1ee-44f4-a59f-cb3f44b056c0", "nickname": "universe", "firefox_profile": "", "niche": "reality shifting raise your vibration aura reading law of attraction manifesting 5D consciousness spiritual awakening", "language": "english", "videos": []}]}
           EOF
 
       - name: Restore YouTube OAuth token

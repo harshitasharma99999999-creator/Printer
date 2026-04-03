@@ -110,13 +110,15 @@ class YouTube:
             topic (str): The generated topic.
         """
         completion = self.generate_response(
-            f"""Generate a compelling YouTube video topic about: {self.niche}
-Style: "Jung Thoughts" channel — philosophical, psychological, dark wisdom.
+            f"""Generate a compelling YouTube Shorts topic about: {self.niche}
+Style: energetic, hypnotic, spiritual — like a reality shifting channel.
 Use formats like:
-- "What a Healed Empath Really Becomes – The Uncomfortable Truth"
-- "The Shadow Self: Why Your Darkest Traits Hold Your Greatest Power"
-- "Why Sensitive People Are Actually the Strongest – A Psychological Warning"
-- "What Happens to Your Mind When You Stop Seeking Approval"
+- "Your Aura Is Sending THIS Signal To The Universe Right Now"
+- "Do This For 5 Minutes And Watch Your Reality Shift Tonight"
+- "Why Your Vibration Is Blocking What You Want (Fix This Now)"
+- "The REAL Reason You Can't Manifest What You Want"
+- "THIS Is Why Your Manifestations Aren't Working"
+- "You Are Shifting Realities RIGHT NOW And Don't Know It"
 Return ONLY the video topic as one sentence. Nothing else."""
         )
 
@@ -135,25 +137,25 @@ Return ONLY the video topic as one sentence. Nothing else."""
             script (str): The script of the video.
         """
         sentence_length = get_script_sentence_length()
-        prompt = f"""You are a deep, authoritative male narrator — commanding, dark, and profound.
+        prompt = f"""You are an energetic, hypnotic spiritual narrator — fast, intense, gripping.
 Write a script of exactly {sentence_length} sentences about the subject below.
 
 Tone:
-- POWERFUL masculine voice — like a wise elder revealing uncomfortable truths
-- Speak directly to the viewer as "you" with absolute authority and gravitas
-- Reference Jungian psychology, shadow work, or spiritual awakening naturally
-- FIRST SENTENCE must be an immediate SCROLL-STOPPING statement — shocking, provocative, makes the viewer freeze
-- Build intensity sentence by sentence toward a devastating insight
-- End with a haunting truth the viewer cannot unhear
+- ENERGETIC and HYPNOTIC — like a frequency that locks the listener in
+- Speak directly to "you" with total conviction and magnetic urgency
+- Reference vibration, frequency, manifestation, aura, reality shifting naturally
+- FIRST SENTENCE must be an immediate REALITY-SHATTERING statement — makes the viewer freeze instantly
+- Build energy and intensity sentence by sentence — getting faster and more powerful
+- End with a commanding declaration that makes them want to act RIGHT NOW
 
 Rules:
 - Exactly {sentence_length} sentences
 - NO markdown, NO titles, NO bullet points
-- NO "welcome to" or "in this video" openings — START with the punch
-- Raw spoken words only — forceful, dark, cinematic, masculine energy
-- Short punchy sentences mixed with deep powerful ones
+- NO "welcome to" or "in this video" — START with the punch
+- Raw spoken words only — electric, spiritual, cinematic urgency
+- Short punchy sentences that hit like rapid-fire truth bombs
 - Use YOU and YOUR constantly — direct address, never passive voice
-- Commands and declarations ONLY — never suggestions ("you must", "you are", "wake up", not "you might want to")
+- Commands and declarations ONLY — "you are", "you must", "this is happening to you NOW"
 - Language: {self.language}
 
 Subject: {self.subject}"""
@@ -285,12 +287,12 @@ Subject: {self.subject}"""
         """
         n_prompts = 5
 
-        prompt = f"""Generate exactly {n_prompts} SCROLL-STOPPING cinematic image prompts for a dark psychological YouTube Short.
-Each prompt must be visually STRIKING enough to make someone stop scrolling instantly.
-Style: hyper-realistic, cinematic, dramatic lighting, emotional intensity — like a movie poster.
-Use extreme close-ups, lone figures in vast landscapes, dramatic light/shadow contrast, surreal imagery.
+        prompt = f"""Generate exactly {n_prompts} HYPNOTIC cinematic image prompts for a spiritual YouTube Short about reality shifting and vibration.
+Each prompt must be visually STUNNING and otherworldly — makes someone stop scrolling instantly.
+Style: cosmic, ethereal, glowing energy fields, auras, sacred geometry, golden light — cinematic and spiritual.
+Use: glowing human silhouettes with visible auras, cosmic energy vortexes, third eye imagery, aurora light fields, sacred geometry overlays, DNA of light.
 Return ONLY a JSON array of {n_prompts} strings, nothing else.
-Example: ["extreme close-up...", "lone silhouette...", "cracked earth..."]
+Example: ["glowing human silhouette with visible violet aura...", "third eye opening with golden rays...", "cosmic energy vortex..."]
 
 Subject: {self.subject}"""
 
@@ -328,11 +330,11 @@ Subject: {self.subject}"""
             if get_verbose():
                 warning("Using fallback image prompts.")
             image_prompts = [
-                f"extreme close-up of a single human eye reflecting storm clouds, tears forming, hyper-realistic, {self.subject}, 8k cinematic",
-                f"lone dark silhouette of a man standing at the edge of a cliff, apocalyptic red sky, lightning, {self.subject}, ultra dramatic",
-                f"cracked earth stretching to the horizon, single figure walking away, scorching light behind, {self.subject}, cinematic desolation",
-                f"man's face half-submerged in dark water, intense gaze upward, chiaroscuro, {self.subject}, psychological tension 8k",
-                f"ancient stone corridor with blinding light at the end, lone shadow walking toward it, {self.subject}, epic cinematic composition",
+                f"glowing human silhouette surrounded by violet and gold aura energy field, cosmic nebula background, {self.subject}, 8k spiritual cinematic",
+                f"third eye opening on a human forehead with blinding golden light rays bursting outward, sacred geometry overlay, ethereal glow, {self.subject}, ultra dramatic",
+                f"person standing inside a cosmic energy vortex, aurora-like swirling light in purple and gold, reality shifting, {self.subject}, hyper-realistic 8k",
+                f"human hands releasing glowing golden energy particles into the universe, law of attraction visualization, stars forming from fingertips, {self.subject}, cinematic spiritual",
+                f"luminous DNA helix made of pure white and gold light ascending into a cosmic sky, frequency vibration, {self.subject}, epic spiritual composition 8k",
             ]
 
         image_prompts = image_prompts[:n_prompts]
