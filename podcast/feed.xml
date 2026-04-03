@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Dark Wisdom Podcast</title>
+    <description>Deep psychology, Jungian philosophy, and uncomfortable truths about the human mind.</description>
+    <link>https://harshitasharma99999999-creator.github.io/Printer</link>
+    <language>en</language>
+    <itunes:category text="Self-Improvement"/>
+    <itunes:explicit>no</itunes:explicit>
+    <item>
+      <title><![CDATA[Beneath Empathy Lies a Darker Heart: The Shadow of Compassion]]></title>
+      <description><![CDATA[[Intro Music: A somber, yet hopeful melody]
+
+[You]: "Welcome, dear listeners. I'm your host, guiding you through the depths of the human experience. Today, we're going to explore a realm that's both alluring and unsettling – the shadow of compassion. Beneath empathy lies a darker heart, and it's high time you confronted this truth. You must understand, compassion is not just about feeling someone's pain; it's also a choice. A choice that can lead you down a path of sacrifice, or even destruction]]></description>
+      <enclosure url="https://github.com/harshitasharma99999999-creator/Printer/releases/download/podcast-20260403101218/audio-podcast.mp3" length="1917405" type="audio/mpeg"/>
+      <guid>ep-20260403101220</guid>
+      <pubDate>Fri, 03 Apr 2026 10:12:20 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
