@@ -1,11 +1,11 @@
 """
-Spiritual image post pipeline.
-Generates a cosmic quote-card image and posts it to:
+Dark-theme quote card image post pipeline.
+Generates scroll-stopping dark images and posts to:
   - Instagram (static photo post via instagrapi)
-  - YouTube (15-second Short: single image + Hugo TTS narration)
+  - YouTube Posts tab (Community Post via internal youtubei/v1 API)
 Runs every 6 hours via image_post_cron.yml.
 """
-import base64
+import json
 import os
 import random
 import textwrap
@@ -25,36 +25,66 @@ from llm_provider import generate_text
 from status import error, info, success, warning
 
 TOPICS = [
+    # Dark relationship / psychology
+    "people show you who they are in the first 90 days — you choose not to see it",
+    "the person who loves you most will hurt you with the truth — the rest lie to keep you",
+    "attachment is not love — it is the fear of being alone wearing love's mask",
+    "most relationships fail because people fall in love with potential not reality",
+    "the one who left taught you more about yourself than the one who stayed",
+    "people do not leave relationships — they leave people who stopped making them feel chosen",
+    "you cannot heal in the same environment that made you sick",
+    "those who gaslight you count on your empathy to silence your instincts",
+    "the loudest person in the room is always the most insecure",
+    "people treat you how you allow them to — silence is a permission",
+    # Spiritual / manifesting
     "you are already what you are seeking",
-    "reality is a mirror of your inner state",
     "your thoughts create the universe you live in",
-    "the present moment contains everything you need",
-    "you are a consciousness having a human experience",
     "manifestation is alignment not effort",
-    "what you believe becomes your reality",
-    "your vibration speaks louder than your words",
     "the universe responds to your feeling not your thinking",
     "you are the creator of every experience you have",
+    "what you believe becomes your reality",
+    "your vibration speaks louder than your words",
+    "reality is a mirror of your inner state",
 ]
 
 HASHTAGS = (
-    "#manifestation #lawofattraction #realityshift #spiritualawakening "
-    "#consciousness #raisingvibration #5D #innerguide #quantumshift #abundance"
+    "#darkpsychology #relationshiptruth #mindset #consciousnessawakening "
+    "#realityshift #lawofattraction #manifestation #spiritualawakening "
+    "#shadowwork #innerwork"
 )
+
+_DARK_TOPICS = {
+    "relationship", "people", "attachment", "leave", "hurt",
+    "gaslight", "love", "left", "heal", "silent", "insecure",
+    "treat", "permission", "potential",
+}
 
 MP_DIR = os.path.join(ROOT_DIR, ".mp")
 
 
 class ImagePost:
+
+    def _is_dark_topic(self, topic: str) -> bool:
+        words = set(topic.lower().split())
+        return bool(words & _DARK_TOPICS)
+
     def generate_quote(self, topic: str) -> str:
-        prompt = (
-            f"Write ONE deeply profound spiritual quote about: {topic}\n"
-            f"Style: YourInnerGuide — calm, wise, ultimate truth. "
-            f"Like something Rumi or Lao Tzu would say.\n"
-            f"The quote must feel like a revelation — something the reader has always "
-            f"felt but never heard said.\n"
-            f"Under 120 characters. No attribution. Return ONLY the quote."
-        )
+        if self._is_dark_topic(topic):
+            prompt = (
+                f"Write ONE dark, brutally honest truth about: {topic}\n"
+                f"Style: dark psychology — short, cuts deep, makes you pause and re-read.\n"
+                f"Like something you've always known but never dared to say out loud.\n"
+                f"Under 140 characters. No attribution. No hashtags. Return ONLY the quote."
+            )
+        else:
+            prompt = (
+                f"Write ONE deeply profound spiritual quote about: {topic}\n"
+                f"Style: YourInnerGuide — calm, wise, ultimate truth. "
+                f"Like something Rumi or Lao Tzu would say.\n"
+                f"The quote must feel like a revelation — something the reader has always "
+                f"felt but never heard said.\n"
+                f"Under 140 characters. No attribution. Return ONLY the quote."
+            )
         quote = generate_text(prompt).strip().strip('"').strip("'")
         if get_verbose():
             info(f"ImagePost quote: {quote}")
@@ -71,9 +101,9 @@ class ImagePost:
         endpoint = f"{base_url}/models/{model}:generateContent"
 
         bg_prompt = (
-            "Cosmic spiritual background for a quote card. "
-            "Deep space with soft golden and violet light, nebula, sacred geometry. "
-            "No text. No faces. Peaceful, divine, awe-inspiring. Square 1:1 format."
+            "Dark cinematic quote card background. Near-black with deep crimson and dark violet "
+            "gradient, dramatic moody lighting, subtle film grain, cinematic atmosphere. "
+            "No text. No faces. Intense, powerful, visually striking. Square 1:1 format."
         )
 
         payload = {
@@ -85,6 +115,7 @@ class ImagePost:
         }
 
         try:
+            import base64
             r = requests.post(
                 endpoint,
                 headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
@@ -117,13 +148,13 @@ class ImagePost:
             img = Image.open(BytesIO(bg_bytes)).convert("RGBA")
             img = img.resize((SIZE, SIZE), Image.LANCZOS)
         else:
-            # Fallback: dark violet gradient
-            img = Image.new("RGBA", (SIZE, SIZE), (30, 10, 60, 255))
+            # Dark near-black deep purple fallback
+            img = Image.new("RGBA", (SIZE, SIZE), (10, 5, 20, 255))
 
         draw = ImageDraw.Draw(img)
 
-        # Try to load a bold system font, fallback to default
-        font_size = 64
+        # Load bold font, fallback chain
+        font_size = 58
         font = None
         font_candidates = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -140,14 +171,21 @@ class ImagePost:
         if font is None:
             font = ImageFont.load_default()
 
-        # Wrap text to ~30 chars per line
-        wrapped = textwrap.fill(quote, width=28)
+        # Wrap text to ~26 chars per line
+        wrapped = textwrap.fill(quote, width=26)
         lines = wrapped.split("\n")
 
-        # Measure total text block height
-        line_height = font_size + 12
+        line_height = font_size + 14
         total_height = line_height * len(lines)
         y_start = (SIZE - total_height) // 2
+
+        # Accent lines above and below text (dark gold)
+        accent_color = (192, 160, 50, 220)   # dark gold
+        padding = 24
+        accent_y_top = y_start - padding
+        accent_y_bot = y_start + total_height + padding - 4
+        draw.line([(100, accent_y_top), (SIZE - 100, accent_y_top)], fill=accent_color, width=2)
+        draw.line([(100, accent_y_bot), (SIZE - 100, accent_y_bot)], fill=accent_color, width=2)
 
         for i, line in enumerate(lines):
             bbox = draw.textbbox((0, 0), line, font=font)
@@ -155,9 +193,9 @@ class ImagePost:
             x = (SIZE - text_w) // 2
             y = y_start + i * line_height
 
-            # Shadow
-            draw.text((x + 3, y + 3), line, font=font, fill=(0, 0, 0, 160))
-            # Main text
+            # Dark red shadow
+            draw.text((x + 4, y + 4), line, font=font, fill=(139, 0, 0, 180))
+            # White main text
             draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
 
         out_path = os.path.join(MP_DIR, f"image_post_{uuid4().hex[:8]}.jpg")
@@ -183,86 +221,86 @@ class ImagePost:
             error(f"Instagram photo upload failed: {e}")
             return ""
 
-    def make_youtube_short(self, image_path: str, quote: str) -> str:
-        """Create a 15-second Short: full-screen image + TTS audio."""
-        from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip
-
-        from .Tts import TTS
-
-        wav_path = os.path.join(MP_DIR, f"image_tts_{uuid4().hex[:8]}.wav")
-        TTS().synthesize(quote, output_file=wav_path)
-
-        audio_clip = AudioFileClip(wav_path)
-        duration = max(audio_clip.duration + 1.0, 15.0)
-
-        # 9:16 for YouTube Shorts (1080×1920)
-        img_clip = (
-            ImageClip(image_path)
-            .set_duration(duration)
-            .resize(height=1920)
-        )
-        # Centre-crop to 1080 wide
-        w, h = img_clip.size
-        if w > 1080:
-            img_clip = img_clip.crop(x_center=w / 2, width=1080)
-
-        video = CompositeVideoClip([img_clip], size=(1080, 1920))
-        video = video.set_audio(audio_clip)
-
-        out_path = os.path.join(MP_DIR, f"image_short_{uuid4().hex[:8]}.mp4")
-        video.write_videofile(
-            out_path,
-            fps=24,
-            codec="libx264",
-            audio_codec="aac",
-            logger=None,
-        )
-        if get_verbose():
-            info(f"ImagePost Short: {out_path}")
-        return out_path
-
-    def upload_youtube_short(self, video_path: str, quote: str, topic: str):
-        """Upload the Short to YouTube via existing upload pipeline."""
-        from cache import get_accounts
-        from .YouTube import YouTube
-
-        accounts = get_accounts("youtube")
-        if not accounts:
-            warning("No YouTube account configured — skipping YouTube Short.")
-            return
-
-        acc = accounts[0]
-        yt = YouTube(
-            account_uuid=acc["id"],
-            account_nickname=acc.get("nickname", ""),
-            fp_profile_path=acc.get("firefox_profile", ""),
-            niche="reality shifting vibration manifestation spiritual awakening",
-            language="English",
-        )
-
-        title = f"{quote[:60]}..." if len(quote) > 60 else quote
-        description = (
-            f"{quote}\n\n"
-            f"✨ {topic.title()}\n\n"
-            f"{HASHTAGS}\n\n"
-            f"#Shorts"
-        )
-        tags = [
-            "manifestation", "lawofattraction", "realityshift",
-            "spiritualawakening", "consciousness", "raisingvibration",
-            "shorts", "spiritual",
-        ]
+    def post_youtube_community(self, image_path: str, quote: str, topic: str) -> str:
+        """Post to YouTube Posts tab using internal youtubei/v1 API."""
+        token_json = os.environ.get("YOUTUBE_TOKEN_JSON", "").strip()
+        if not token_json:
+            warning("YOUTUBE_TOKEN_JSON not set — skipping YouTube community post.")
+            return ""
 
         try:
-            yt.upload_video(
-                video_path=video_path,
-                title=title,
-                description=description,
-                tags=tags,
-            )
-            success("YouTube Short (image) uploaded.")
+            from google.auth.transport.requests import Request as GoogleRequest
+            from google.oauth2.credentials import Credentials
+
+            SCOPES = [
+                "https://www.googleapis.com/auth/youtube",
+                "https://www.googleapis.com/auth/youtube.upload",
+            ]
+            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            if creds.expired and creds.refresh_token:
+                creds.refresh(GoogleRequest())
+            access_token = creds.token
         except Exception as e:
-            error(f"YouTube Short upload failed: {e}")
+            warning(f"YouTube credentials failed: {e}")
+            return ""
+
+        auth_header = {"Authorization": f"Bearer {access_token}"}
+
+        # Build post text
+        tag = "#" + "".join(w.capitalize() for w in topic.split())[:20]
+        text = f"{quote}\n\n{tag} {HASHTAGS}"
+
+        # Step 1: Upload image blob
+        image_key = None
+        try:
+            with open(image_path, "rb") as f:
+                img_bytes = f.read()
+            r2 = requests.post(
+                "https://upload.youtube.com/upload/youtubei/v1/community/create_post_image"
+                "?uploadType=media",
+                headers={**auth_header, "Content-Type": "image/jpeg"},
+                data=img_bytes,
+                timeout=60,
+            )
+            if r2.ok:
+                image_key = r2.json().get("key")
+                if get_verbose():
+                    info(f"YouTube community image uploaded, key: {image_key}")
+            else:
+                warning(f"YouTube community image upload: {r2.status_code} — falling back to text-only.")
+        except Exception as e:
+            warning(f"YouTube community image upload failed ({e}), posting text-only.")
+
+        # Step 2: Create community post
+        payload = {
+            "context": {
+                "client": {"clientName": "WEB", "clientVersion": "2.20240101", "hl": "en"}
+            },
+            "postTextOriginal": text,
+        }
+        if image_key:
+            payload["contentTypeInfo"] = {
+                "imagePost": {"images": [{"key": image_key}]}
+            }
+
+        try:
+            r3 = requests.post(
+                "https://www.youtube.com/youtubei/v1/community/create_post",
+                headers={**auth_header, "X-Goog-AuthUser": "0", "Content-Type": "application/json"},
+                json=payload,
+                timeout=30,
+            )
+            if r3.ok:
+                post_id = r3.json().get("postId", "")
+                url = f"https://www.youtube.com/post/{post_id}" if post_id else "YouTube"
+                success(f"YouTube community post published: {url}")
+                return url
+            else:
+                warning(f"YouTube community post failed: {r3.status_code} {r3.text[:200]}")
+                return ""
+        except Exception as e:
+            error(f"YouTube community post exception: {e}")
+            return ""
 
     def run(self, topic: str = None):
         os.makedirs(MP_DIR, exist_ok=True)
@@ -282,10 +320,7 @@ class ImagePost:
         info("Posting to Instagram...")
         self.post_to_instagram(image_path, quote, topic)
 
-        info("Creating YouTube Short...")
-        short_path = self.make_youtube_short(image_path, quote)
-
-        info("Uploading YouTube Short...")
-        self.upload_youtube_short(short_path, quote, topic)
+        info("Posting to YouTube community...")
+        self.post_youtube_community(image_path, quote, topic)
 
         success(f"ImagePost done — topic: {topic}")
