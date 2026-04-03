@@ -73,14 +73,15 @@ class LongForm:
 
     def generate_topic(self) -> str:
         prompt = (
-            f"You are a top YouTube creator in the '{self.niche}' niche.\n"
-            f"Generate ONE specific, fascinating, clickable video topic for a 10-15 minute "
-            f"long-form YouTube video about {self.niche}.\n"
-            f"The topic must be urgent, hypnotic, and make the viewer feel it speaks directly to them.\n"
-            f"Examples: 'Why Your Vibration Is Blocking Everything You Want (And How To Fix It Tonight)', "
-            f"'The Science Of Reality Shifting: How To Move Between Timelines', "
-            f"'Your Aura Color Reveals Exactly What The Universe Is Sending You', "
-            f"'The 5D Shift Is Happening NOW: Here Is What You Must Do'\n"
+            f"You are the creator of 'YourInnerGuide' — a channel that reveals ultimate spiritual truths to help people shift their reality.\n"
+            f"Generate ONE deeply meaningful long-form YouTube video topic (10-15 minutes) about {self.niche}.\n"
+            f"The topic must feel like a life-changing revelation — as if the viewer's higher self is calling them to watch.\n"
+            f"Examples:\n"
+            f"'The Ultimate Truth About Who You Really Are — And Why You Forgot It'\n"
+            f"'How To Shift Your Reality Using The Power You Were Born With'\n"
+            f"'Everything You Believe About Reality Is Wrong — Here Is The Truth'\n"
+            f"'The Consciousness Blueprint: How To Awaken And Create The Life You Were Meant To Live'\n"
+            f"'You Are A Multidimensional Being — This Is How To Access Your True Power'\n"
             f"Return ONLY the topic, nothing else."
         )
         raw = generate_text(prompt).strip()
@@ -100,21 +101,22 @@ class LongForm:
 
         # Hook — SCROLL-STOPPING, commanding male narrator energy
         hook = generate_text(
-            f"Write a 4-sentence EXPLOSIVE opening hook for a spiritual YouTube video about: {self.subject}.\n"
-            f"You are an energetic, hypnotic spiritual narrator — electric, fast, gripping.\n"
-            f"Sentence 1: A REALITY-SHATTERING statement about vibration or manifestation — makes the viewer freeze instantly.\n"
-            f"Sentence 2: Tell them something is happening to them RIGHT NOW that they don't see.\n"
-            f"Sentence 3: Speak directly as 'you' — make it personal, urgent, cosmic.\n"
-            f"Sentence 4: Promise the exact shift they're about to experience in the next few minutes.\n"
-            f"Language: {self.language}. NO titles, NO markdown. Raw spoken words only.\n"
-            f"Use YOU and YOUR constantly. Commands and declarations only — never suggestions."
+            f"Write a 4-sentence opening for a spiritual long-form YouTube video about: {self.subject}.\n"
+            f"You are 'YourInnerGuide' — a deeply wise spiritual teacher revealing ultimate truths about consciousness and reality.\n"
+            f"Sentence 1: Open with a profound ultimate truth that makes the viewer feel they have been waiting to hear this their whole life.\n"
+            f"Sentence 2: Tell them something about their true nature or the nature of reality that most people never discover.\n"
+            f"Sentence 3: Make it deeply personal — speak directly to 'you' as if you are their own inner voice finally speaking.\n"
+            f"Sentence 4: Tell them exactly what truth they will carry with them after watching this video.\n"
+            f"Language: {self.language}. NO titles, NO markdown. Calm, wise, profound spoken words only.\n"
+            f"Use YOU and YOUR constantly. Reveal truth — never preach or suggest."
         ).strip()
         parts.append(hook)
 
         # Section outline
         outline_raw = generate_text(
-            f"List exactly 5 dark, powerful section titles for a 12-minute YouTube video about: {self.subject}.\n"
-            f"Style: Jung Thoughts channel — philosophical, psychological, uncomfortable truths.\n"
+            f"List exactly 5 section titles for a 12-minute 'YourInnerGuide' style spiritual video about: {self.subject}.\n"
+            f"Each section should guide the viewer deeper into the truth — from realizing something is wrong, to discovering the truth, to knowing how to shift their reality.\n"
+            f"Style: profound, guiding, consciousness-expanding. Like chapters of an awakening journey.\n"
             f"Format: numbered list 1-5. No explanations."
         ).strip()
         section_titles = []
@@ -124,23 +126,23 @@ class LongForm:
                 section_titles.append(m.group(1).strip())
         if len(section_titles) < 5:
             section_titles = [
-                "The Psychology Behind This",
-                "Why Most People Miss This",
-                "The Hidden Patterns",
-                "How To Apply This In Your Life",
-                "What Changes When You Know This",
+                "The Truth About Who You Really Are",
+                "Why Your Reality Feels Stuck — And What Is Actually Happening",
+                "The Hidden Mechanics Of Consciousness And Reality",
+                "How To Shift Your Reality Starting Right Now",
+                "The Life That Awaits You On The Other Side Of This Truth",
             ]
 
         # Each section body — powerful masculine narrator
         for title in section_titles[:5]:
             section = generate_text(
-                f"Write 6 powerful spoken sentences for the section '{title}' "
-                f"in a spiritual video about: {self.subject}.\n"
-                f"Tone: energetic, hypnotic, electric — like a frequency that locks the listener in.\n"
-                f"Speak to the viewer as 'you' with total conviction. Reference vibration, aura, manifestation, reality shifting.\n"
-                f"Mix rapid-fire truth bombs with longer hypnotic declarations.\n"
-                f"Language: {self.language}. NO markdown, NO headers. Raw spoken words only.\n"
-                f"Use YOU and YOUR constantly. Commands and declarations only — never suggestions."
+                f"Write 6 deeply guiding spoken sentences for the section '{title}' "
+                f"in a 'YourInnerGuide' style video about: {self.subject}.\n"
+                f"Tone: calm, wise, certain — like a spiritual teacher revealing truth that changes everything.\n"
+                f"Guide the viewer deeper into understanding their true nature, consciousness, and how to shift their reality.\n"
+                f"Each sentence must feel like a revelation — truth they have always known but never had words for.\n"
+                f"Language: {self.language}. NO markdown, NO headers. Wise, calm, profound spoken words only.\n"
+                f"Use YOU and YOUR constantly. Reveal — never preach or lecture."
             ).strip()
             parts.append(section)
 
