@@ -175,6 +175,64 @@ Subject: {self.subject}"""
 
         return completion
 
+    def _get_product_affiliate_link(self) -> str:
+        """
+        Finds an exact Amazon product matching the video topic and returns a direct
+        affiliate link (/dp/ASIN?tag=...). Falls back to a topic-relevant search URL.
+        """
+        import requests as _req
+        import re as _re
+        from urllib.parse import urlparse as _urlparse, parse_qs as _parse_qs, quote_plus as _qp
+
+        base = get_affiliate_link()
+        # Extract affiliate tag from the configured URL
+        tag = _parse_qs(_urlparse(base).query).get("tag", ["harshita000-21"])[0]
+
+        # LLM extracts 2-3 product keywords from the video subject
+        kw_prompt = (
+            f"Extract 2-3 Amazon product search keywords from this YouTube video topic. "
+            f"Think: what physical or digital product would someone watching this video want to buy? "
+            f"Return ONLY a short search phrase (e.g. 'meditation cushion', 'journal notebook'), nothing else.\n"
+            f"Topic: {self.subject}"
+        )
+        try:
+            keywords = generate_text(kw_prompt).strip().strip('"').strip("'")
+        except Exception:
+            keywords = ""
+
+        if not keywords:
+            return base  # fallback to static config link
+
+        encoded = _qp(keywords)
+        search_url = f"https://www.amazon.in/s?k={encoded}&tag={tag}"
+
+        # Scrape first product ASIN from Amazon search results
+        try:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-IN,en;q=0.9",
+            }
+            r = _req.get(search_url, headers=headers, timeout=12)
+            asins = _re.findall(r"/dp/([A-Z0-9]{10})", r.text)
+            if asins:
+                asin = asins[0]
+                product_url = f"https://www.amazon.in/dp/{asin}?tag={tag}"
+                if get_verbose():
+                    info(f"Affiliate product link: {product_url} (keywords: {keywords})")
+                return product_url
+        except Exception as e:
+            if get_verbose():
+                warning(f"Amazon ASIN scrape failed ({e}), using search URL.")
+
+        # Still topic-relevant — far better than a generic category page
+        if get_verbose():
+            info(f"Affiliate search link: {search_url}")
+        return search_url
+
     def generate_metadata(self) -> dict:
         """
         Generates Video metadata for the to-be-uploaded YouTube Short (Title, Description).
@@ -200,9 +258,15 @@ Subject: {self.subject}"""
             f"Please generate a YouTube Video Description for the following script: {self.script}. Only return the description, nothing else."
         )
 
-        affiliate_link = get_affiliate_link()
+        affiliate_link = self._get_product_affiliate_link()
         if affiliate_link:
-            description += f"\n\n🛒 Recommended products for your journey:\n{affiliate_link}"
+            description += f"\n\n🛒 Get it here → {affiliate_link}"
+            # Write for Instagram runner to pick up in the same CI run
+            try:
+                with open(os.path.join(ROOT_DIR, ".mp", "affiliate_link.txt"), "w") as _f:
+                    _f.write(affiliate_link)
+            except Exception:
+                pass
 
         # #Shorts tag is required for YouTube to classify vertical videos as Shorts
         if "#Shorts" not in description and "#shorts" not in description:

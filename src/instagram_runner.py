@@ -54,6 +54,18 @@ def main():
     if caption_override:
         caption = caption_override
 
+    # Append the topic-specific affiliate product link written by YouTube pipeline
+    _link_file = os.path.join(mp_dir, "affiliate_link.txt")
+    _aff_link = ""
+    if os.path.exists(_link_file):
+        try:
+            with open(_link_file, "r") as _f:
+                _aff_link = _f.read().strip()
+        except Exception:
+            pass
+    if _aff_link and not caption_override:
+        caption += f"\n\n🛒 {_aff_link}"
+
     from classes.Instagram import Instagram
     ig = Instagram(username, password)
     try:
