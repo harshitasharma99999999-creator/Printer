@@ -68,3 +68,11 @@ class Instagram:
         if get_verbose():
             success(f"Instagram Reel uploaded: {url}")
         return url
+
+    def upload_photo(self, image_path: str, caption: str) -> str:
+        cl = self._get_client()
+        media = cl.photo_upload(Path(image_path), caption)
+        url = f"https://www.instagram.com/p/{media.code}/"
+        if get_verbose():
+            success(f"Instagram photo posted: {url}")
+        return url
