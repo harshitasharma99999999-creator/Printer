@@ -321,30 +321,93 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             except Exception as e:
                 warning(f"Failed to set Vercel env {key}: {e}")
 
+    def _redeploy(self, app_dir: str, config: dict, vercel_token: str) -> str:
+        """Trigger a fresh Vercel deploy and return the URL."""
+        slug = config["app_slug"]
+        result = subprocess.run(
+            ["vercel", "--token", vercel_token, "--yes", "--prod", "--name", slug],
+            cwd=app_dir, capture_output=True, text=True, timeout=300,
+        )
+        output = result.stdout + result.stderr
+        match = re.search(r"https://[\w.-]+\.vercel\.app", output)
+        return match.group() if match else f"https://{slug}.vercel.app"
+
+    def verify_app(self, url: str, config: dict) -> dict:
+        """
+        Hit the live app and verify all critical endpoints work.
+        Returns dict: { tool_ok, payment_ok, errors[] }
+        """
+        import time as _time
+        results = {"tool_ok": False, "payment_ok": False, "errors": []}
+
+        # Wait for Vercel to propagate the new deployment
+        _time.sleep(15)
+
+        # 1. Check homepage loads
+        try:
+            r = requests.get(url, timeout=20)
+            if r.status_code != 200:
+                results["errors"].append(f"Homepage returned {r.status_code}")
+        except Exception as e:
+            results["errors"].append(f"Homepage unreachable: {e}")
+
+        # 2. Verify /api/generate works (AI tool)
+        try:
+            r = requests.post(
+                f"{url}/api/generate",
+                json={"input1": config.get("input_1_placeholder", "test"), "input2": "test"},
+                timeout=30,
+            )
+            data = r.json()
+            if r.status_code == 200 and data.get("result"):
+                results["tool_ok"] = True
+                if get_verbose():
+                    info(f"Verify: /api/generate OK — result: {str(data['result'])[:80]}…")
+            else:
+                results["errors"].append(f"/api/generate failed: {r.status_code} {str(data)[:100]}")
+        except Exception as e:
+            results["errors"].append(f"/api/generate error: {e}")
+
+        # 3. Verify /api/checkout responds (payment)
+        try:
+            r = requests.post(
+                f"{url}/api/checkout",
+                json={"email": "test@test.com", "yearly": False},
+                timeout=20,
+            )
+            data = r.json()
+            if r.status_code == 200 and data.get("url"):
+                results["payment_ok"] = True
+                if get_verbose():
+                    info("Verify: /api/checkout OK — payment link returned.")
+            elif "not configured" in str(data).lower() or r.status_code == 500:
+                results["errors"].append("Payment not configured: DODO_API_KEY or DODO_PRODUCT_ID missing on Vercel.")
+            else:
+                results["errors"].append(f"/api/checkout: {r.status_code} {str(data)[:100]}")
+        except Exception as e:
+            results["errors"].append(f"/api/checkout error: {e}")
+
+        return results
+
     def deploy(self, app_dir: str, config: dict) -> str:
         vercel_token = os.environ.get("VERCEL_TOKEN", "")
         if not vercel_token:
             raise ValueError("VERCEL_TOKEN env var not set")
 
         slug = config["app_slug"]
+        dodo_api_key = os.environ.get("DODO_API_KEY", "")
+        dodo_product_id = os.environ.get("DODO_PRODUCT_ID", "")
 
-        cmd = [
-            "vercel",
-            "--token", vercel_token,
-            "--yes",
-            "--prod",
-            "--name", slug,
-        ]
+        if not dodo_api_key or not dodo_product_id:
+            warning("DODO_API_KEY or DODO_PRODUCT_ID not set — payment will be broken. "
+                    "Add these to GitHub secrets to enable payments.")
 
         if get_verbose():
-            info(f"Deploying {config['app_name']} to Vercel...")
+            info(f"Deploying {config['app_name']} to Vercel (pass 1 — build)...")
 
         result = subprocess.run(
-            cmd,
-            cwd=app_dir,
-            capture_output=True,
-            text=True,
-            timeout=300,
+            ["vercel", "--token", vercel_token, "--yes", "--prod", "--name", slug],
+            cwd=app_dir, capture_output=True, text=True, timeout=300,
         )
 
         output = result.stdout + result.stderr
@@ -357,17 +420,20 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if result.returncode != 0 and not deploy_url:
             raise RuntimeError(f"Vercel deploy failed:\n{output[-1000:]}")
 
-        # Set env vars via Vercel API so they persist for all future deployments
-        dodo_api_key = os.environ.get("DODO_API_KEY", "")
-        dodo_product_id = os.environ.get("DODO_PRODUCT_ID", "")
         base_url = deploy_url or f"https://{slug}.vercel.app"
 
+        # Set all env vars via Vercel API
         self.set_vercel_env_vars(slug, {
             "DODO_API_KEY": dodo_api_key,
             "DODO_PRODUCT_ID": dodo_product_id,
             "NEXT_PUBLIC_BASE_URL": base_url,
             "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY", ""),
         })
+
+        # Redeploy so the env vars take effect in the running build
+        if get_verbose():
+            info("Redeploying with env vars applied (pass 2)...")
+        base_url = self._redeploy(app_dir, config, vercel_token)
 
         success(f"Deployed to {base_url}")
         return base_url
@@ -767,14 +833,37 @@ What would you add or improve? Drop a comment below 👇
         config = self.generate_config(demand_posts)
         app_dir = self.build_app(config)
         url = self.deploy(app_dir, config)
+
+        # ── Pre-marketing verification ──────────────────────────────────────
+        if get_verbose():
+            info(f"Verifying app health at {url}...")
+        check = self.verify_app(url, config)
+
+        if check["errors"]:
+            for e in check["errors"]:
+                warning(f"App check: {e}")
+
+        if not check["tool_ok"]:
+            error("ABORT: /api/generate is broken — AI tool not working. "
+                  "Check GEMINI_API_KEY is set on Vercel. NOT marketing this app.")
+            return url
+
+        if not check["payment_ok"]:
+            warning("Payment check failed — DODO_API_KEY or DODO_PRODUCT_ID missing. "
+                    "App will be live but users cannot pay. "
+                    "Add DODO_API_KEY + DODO_PRODUCT_ID to GitHub secrets and re-run. "
+                    "Skipping marketing and Play Store until payment works.")
+            return url
+
+        # ── Both checks passed — safe to market ─────────────────────────────
+        success(f"App verified: tool=✅ payment=✅ → proceeding with marketing")
         self.print_marketing_plan(config, url)
 
-        # Marketing — run all channels
         self.tweet_launch(config, url)
         self.post_to_devto(config, url)
         self.post_to_reddit(config, url)
 
-        # Build Android TWA and publish to Play Store if secrets are configured
+        # Build Android TWA and publish to Play Store
         if os.environ.get("ANDROID_KEYSTORE_BASE64") and os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON"):
             aab_path = self.build_twa(app_dir, config, url)
             if aab_path:
@@ -782,5 +871,5 @@ What would you add or improve? Drop a comment below 👇
         elif get_verbose():
             info("Android secrets not set — skipping TWA build and Play Store publish.")
 
-        success(f"Done! App live at: {url}")
+        success(f"Done! App fully live at: {url}")
         return url
