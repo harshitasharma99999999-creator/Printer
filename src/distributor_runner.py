@@ -2,7 +2,7 @@
 Content Distributor — runs every 8 hours independently.
 
 Generates fresh psychology/mindset content and auto-publishes to:
-  1. Medium Partner Program (ad revenue per read)
+  1. Dev.to (Google SEO + creator monetization program)
   2. Beehiiv Newsletter (ad network pays per subscriber)
   3. Spotify Podcast via GitHub Releases + RSS (monetize at 100 listeners/ep)
   4. Pinterest Affiliate Pins (buyer-intent traffic → affiliate commissions)
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from llm_provider import generate_text
 from config import ROOT_DIR, get_verbose, get_affiliate_link
 from status import info, warning, success, error
-from classes.Medium import Medium
+from classes.DevTo import DevTo
 from classes.Newsletter import Newsletter
 from classes.Podcast import Podcast
 from classes.Pinterest import Pinterest
@@ -254,16 +254,16 @@ def main():
     md_article = to_markdown(topic, content["article"], affiliate_link)
     newsletter_html = to_newsletter_html(content["newsletter"], affiliate_link)
 
-    # 4. Medium
+    # 4. Dev.to
     try:
-        Medium().post_article(
+        DevTo().post_article(
             title=topic,
-            content_html=html_article,
-            tags=["psychology", "self-improvement", "mindset", "philosophy", "jungian"],
+            content_markdown=md_article,
+            tags=["psychology", "selfimprovement", "mindset", "philosophy"],
         )
     except Exception as e:
         if get_verbose():
-            warning(f"Medium: {e}")
+            warning(f"Dev.to: {e}")
 
     # 5. Beehiiv Newsletter
     try:

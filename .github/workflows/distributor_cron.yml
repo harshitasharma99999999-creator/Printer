@@ -96,8 +96,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          # Medium
-          MEDIUM_INTEGRATION_TOKEN: ${{ secrets.MEDIUM_INTEGRATION_TOKEN }}
+          # Dev.to
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
           # Beehiiv Newsletter
           BEEHIIV_API_KEY: ${{ secrets.BEEHIIV_API_KEY }}
           BEEHIIV_PUBLICATION_ID: ${{ secrets.BEEHIIV_PUBLICATION_ID }}
