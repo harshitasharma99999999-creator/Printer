@@ -687,13 +687,17 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             r1 = client.create_tweet(text=t1)
             t1_id = r1.data["id"]
             client.create_tweet(text=t2, in_reply_to_tweet_id=t1_id)
-            r3 = client.create_tweet(text=t3, in_reply_to_tweet_id=t1_id)
-            if get_verbose():
-                success(f"Twitter thread posted (3 tweets). First tweet id: {t1_id}")
+            client.create_tweet(text=t3, in_reply_to_tweet_id=t1_id)
+            success(f"Twitter thread posted (3 tweets). First tweet id: {t1_id}")
             return True
         except Exception as e:
-            if get_verbose():
-                warning(f"Twitter thread failed: {e}")
+            error(f"Twitter post failed: {e}")
+            warning(
+                "Twitter fix: go to developer.twitter.com → Your App → Settings → "
+                "App permissions → set to 'Read and Write' → save → "
+                "Keys and Tokens → Regenerate Access Token + Secret → "
+                "update TWITTER_ACCESS_TOKEN and TWITTER_ACCESS_TOKEN_SECRET in GitHub secrets."
+            )
             return False
 
     def post_to_devto(self, config: dict, url: str) -> bool:
