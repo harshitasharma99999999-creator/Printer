@@ -4,8 +4,6 @@ Run this ONCE on your local machine while logged into the account.
 
 Usage:
     python scripts/gen_instagram_session.py
-
-Then copy the printed JSON and save it as a GitHub secret.
 """
 import json
 import sys
@@ -16,9 +14,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 def main():
     try:
         from instagrapi import Client
+        from instagrapi.exceptions import ChallengeRequired, TwoFactorRequired
     except ImportError:
-        print("ERROR: instagrapi not installed.")
-        print("Run:  pip install instagrapi")
+        print("ERROR: instagrapi not installed. Run: pip install instagrapi")
         sys.exit(1)
 
     username = input("Instagram username: ").strip()
@@ -30,6 +28,52 @@ def main():
 
     try:
         cl.login(username, password)
+    except ChallengeRequired:
+        print("\nInstagram requires verification.")
+
+        # Resolve the challenge context first
+        try:
+            cl.challenge_resolve(cl.last_json)
+        except Exception:
+            pass
+
+        # Try SMS (phone=0) first, then email (1) as fallback
+        sent = False
+        for method in (0, 1):
+            try:
+                cl.challenge_send_code(method)
+                label = "phone/SMS" if method == 0 else "email"
+                print(f"Verification code sent via {label}. Check now.")
+                sent = True
+                break
+            except Exception:
+                continue
+
+        if not sent:
+            print("Could not send verification code automatically.")
+            print("Check your phone or email manually for a code from Instagram.")
+
+        code = input("Enter verification code: ").strip()
+        try:
+            cl.challenge_code(code)
+        except Exception as e:
+            print(f"Challenge code failed: {e}")
+            print("\nTry logging in on your phone first, then re-run this script.")
+            sys.exit(1)
+
+        # Complete login after challenge
+        try:
+            cl.login(username, password)
+        except Exception:
+            pass  # Session may already be active after challenge
+
+    except TwoFactorRequired:
+        code = input("Enter your 2FA code: ").strip()
+        try:
+            cl.two_factor_login(code)
+        except Exception as e:
+            print(f"2FA login failed: {e}")
+            sys.exit(1)
     except Exception as e:
         print(f"\nLogin failed: {e}")
         sys.exit(1)
