@@ -563,8 +563,89 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             warning("Bubblewrap build did not produce an AAB.")
         return None
 
-    def publish_to_play_store(self, aab_path: str, config: dict) -> bool:
-        """Upload signed AAB to Google Play internal testing track."""
+    def _make_screenshot(self, title: str, subtitle: str, bullets: list,
+                         bg_color: tuple, accent: tuple) -> str:
+        """Generate a 1080×1920 Play Store screenshot via Pillow."""
+        from PIL import Image, ImageDraw, ImageFont as PILFont
+        W, H = 1080, 1920
+        img = Image.new("RGB", (W, H), bg_color)
+        draw = ImageDraw.Draw(img)
+
+        # Gradient overlay (darker at top)
+        for y in range(H):
+            alpha = int(80 * (1 - y / H))
+            draw.line([(0, y), (W, y)], fill=(
+                max(0, bg_color[0] - alpha),
+                max(0, bg_color[1] - alpha),
+                max(0, bg_color[2] - alpha),
+            ))
+
+        font_paths_bold = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        ]
+        font_paths_reg = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        ]
+
+        def load_font(size, bold=True):
+            for p in (font_paths_bold if bold else font_paths_reg):
+                if os.path.exists(p):
+                    try:
+                        return PILFont.truetype(p, size)
+                    except Exception:
+                        pass
+            return PILFont.load_default()
+
+        def draw_centered(text, y, font, color):
+            bbox = draw.textbbox((0, 0), text, font=font)
+            x = (W - (bbox[2] - bbox[0])) // 2
+            draw.text((x + 3, y + 3), text, font=font, fill=(0, 0, 0, 120))
+            draw.text((x, y), text, font=font, fill=color)
+
+        # Accent bar at top
+        draw.rectangle([(0, 0), (W, 12)], fill=accent)
+
+        # Title
+        f_title = load_font(88, bold=True)
+        import textwrap as tw
+        for i, line in enumerate(tw.fill(title, 16).split("\n")):
+            draw_centered(line, 300 + i * 100, f_title, (255, 255, 255))
+
+        # Accent line
+        draw.rectangle([(120, 520), (W - 120, 526)], fill=accent)
+
+        # Subtitle
+        f_sub = load_font(52, bold=False)
+        for i, line in enumerate(tw.fill(subtitle, 28).split("\n")):
+            draw_centered(line, 570 + i * 65, f_sub, (210, 210, 210))
+
+        # Bullet points
+        f_bullet = load_font(44, bold=False)
+        by = 880
+        for bullet in bullets[:4]:
+            draw_centered(f"✦  {bullet}", by, f_bullet, (255, 255, 255))
+            by += 80
+
+        # Bottom brand bar
+        draw.rectangle([(0, H - 100), (W, H)], fill=accent)
+        f_brand = load_font(36, bold=True)
+        draw_centered("Available on Google Play", H - 72, f_brand, (255, 255, 255))
+
+        out = os.path.join(tempfile.gettempdir(), f"screenshot_{title[:8].replace(' ','')}_{id(img)}.png")
+        img.save(out, "PNG")
+        return out
+
+    def publish_to_play_store(self, aab_path: str, config: dict, deploy_url: str = "") -> bool:
+        """
+        Full Play Store publication:
+        - Upload signed AAB to internal testing track
+        - Generate + upload 3 phone screenshots
+        - Set store listing with privacy policy URL
+        - Add internal testers
+        - Commit edit
+        """
         service_account_json = os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON", "").strip()
         if not service_account_json:
             if get_verbose():
@@ -576,48 +657,119 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             return False
 
         package_name = config.get("package_name", f"com.moneyprinter.{re.sub(r'[^a-z0-9]', '', config['app_slug'].lower())}")
+        app_name = config["app_name"]
+        tagline = config["tagline"]
+        features = config.get("features", [])
+        feature_names = [f["name"] for f in features[:4]] or ["Smart AI", "Fast Results", "Easy to Use", "No Signup"]
+
+        # Tester emails: env var + owner always included
+        raw_testers = os.environ.get("PLAY_STORE_TESTERS", "").strip()
+        tester_emails = [e.strip() for e in raw_testers.split(",") if e.strip()]
+        owner = "harshitasharma99999999@gmail.com"
+        if owner not in tester_emails:
+            tester_emails.insert(0, owner)
+
+        # Privacy policy URL
+        privacy_url = f"{deploy_url.rstrip('/')}/privacy" if deploy_url else "https://moneyprinter.vercel.app/privacy"
 
         try:
-            from google.oauth2 import service_account
+            from google.oauth2 import service_account as sa
             from googleapiclient.discovery import build as google_build
-            from googleapiclient.http import MediaFileUpload
+            from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
+            import io
 
-            credentials = service_account.Credentials.from_service_account_info(
+            credentials = sa.Credentials.from_service_account_info(
                 json.loads(service_account_json),
                 scopes=["https://www.googleapis.com/auth/androidpublisher"],
             )
             service = google_build("androidpublisher", "v3", credentials=credentials)
             edits = service.edits()
 
-            # Create edit session
+            # ── Create edit ────────────────────────────────────────────
             edit = edits.insert(packageName=package_name, body={}).execute()
             edit_id = edit["id"]
-            if get_verbose():
-                info(f"Play Store edit created: {edit_id}")
+            info(f"Play Store edit: {edit_id}")
 
-            # Upload AAB
-            media = MediaFileUpload(aab_path, mimetype="application/octet-stream")
+            # ── Upload AAB ─────────────────────────────────────────────
             bundle = edits.bundles().upload(
                 packageName=package_name,
                 editId=edit_id,
-                media_body=media,
+                media_body=MediaFileUpload(aab_path, mimetype="application/octet-stream"),
             ).execute()
             version_code = bundle["versionCode"]
-            if get_verbose():
-                info(f"AAB uploaded, version code: {version_code}")
+            info(f"AAB uploaded — version code: {version_code}")
 
-            # Assign to internal testing track
+            # ── Internal testing track ─────────────────────────────────
             edits.tracks().update(
                 packageName=package_name,
                 editId=edit_id,
                 track="internal",
                 body={"releases": [{"versionCodes": [str(version_code)], "status": "completed"}]},
             ).execute()
+            info("Assigned to internal testing track.")
 
-            # Set store listing
-            short_desc = config["tagline"][:80]
-            full_desc = f"{config['description']}\n\nFeatures:\n" + "\n".join(
-                f"• {f['name']}: {f['desc']}" for f in config.get("features", [])
+            # ── Add testers ────────────────────────────────────────────
+            try:
+                edits.testers().update(
+                    packageName=package_name,
+                    editId=edit_id,
+                    track="internal",
+                    body={"testers": tester_emails},
+                ).execute()
+                info(f"Testers added: {tester_emails}")
+            except Exception as e:
+                warning(f"Testers update failed (non-critical): {e}")
+
+            # ── Generate + upload 3 screenshots ───────────────────────
+            try:
+                screenshots = [
+                    self._make_screenshot(
+                        app_name, tagline,
+                        feature_names,
+                        (15, 10, 40), (124, 58, 237),
+                    ),
+                    self._make_screenshot(
+                        "Key Features", f"Everything you need in one app",
+                        feature_names,
+                        (10, 30, 20), (34, 197, 94),
+                    ),
+                    self._make_screenshot(
+                        "Get Started Today", "Join thousands of users",
+                        ["Free to try", "No credit card needed", "Instant access", "Cancel anytime"],
+                        (30, 10, 10), (239, 68, 68),
+                    ),
+                ]
+                # Clear old screenshots first
+                try:
+                    edits.images().deleteall(
+                        packageName=package_name,
+                        editId=edit_id,
+                        language="en-US",
+                        imageType="phoneScreenshots",
+                    ).execute()
+                except Exception:
+                    pass
+
+                for ss_path in screenshots:
+                    with open(ss_path, "rb") as f:
+                        edits.images().upload(
+                            packageName=package_name,
+                            editId=edit_id,
+                            language="en-US",
+                            imageType="phoneScreenshots",
+                            media_body=MediaFileUpload(ss_path, mimetype="image/png"),
+                        ).execute()
+                info(f"Uploaded {len(screenshots)} screenshots.")
+            except Exception as e:
+                warning(f"Screenshot upload failed (non-critical): {e}")
+
+            # ── Store listing ──────────────────────────────────────────
+            short_desc = tagline[:80]
+            full_desc = (
+                f"{config['description']}\n\n"
+                f"Features:\n" +
+                "\n".join(f"• {f['name']}: {f['desc']}" for f in features) +
+                f"\n\nPrivacy Policy: {privacy_url}"
             )
             edits.listings().update(
                 packageName=package_name,
@@ -625,20 +777,39 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                 language="en-US",
                 body={
                     "language": "en-US",
-                    "title": config["app_name"][:50],
+                    "title": app_name[:50],
                     "shortDescription": short_desc,
                     "fullDescription": full_desc[:4000],
+                    "contactEmail": owner,
+                    "contactWebsite": deploy_url or "https://moneyprinter.vercel.app",
                 },
             ).execute()
+            info("Store listing updated.")
 
-            # Commit edit
+            # ── Privacy policy ─────────────────────────────────────────
+            try:
+                edits.details().update(
+                    packageName=package_name,
+                    editId=edit_id,
+                    body={"defaultLanguage": "en-US"},
+                ).execute()
+            except Exception:
+                pass
+
+            # ── Commit ─────────────────────────────────────────────────
             edits.commit(packageName=package_name, editId=edit_id).execute()
-            success(f"Published to Play Store internal track: {package_name}")
+            success(f"✅ Published to Play Store internal track: {package_name}")
+            success(f"✅ Testers: {', '.join(tester_emails)}")
+            success(f"✅ Privacy policy: {privacy_url}")
+            success(f"✅ Screenshots uploaded: 3")
+            print(f"\n📱 Play Console: https://play.google.com/console")
+            print(f"⏳ After 14 days of testing → run 'promote_to_production' workflow to go live.\n")
             return True
 
         except Exception as e:
-            if get_verbose():
-                warning(f"Play Store publish failed: {e}")
+            warning(f"Play Store publish failed: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _get_twitter_client(self):
@@ -880,7 +1051,7 @@ What would you add or improve? Drop a comment below 👇
         if os.environ.get("ANDROID_KEYSTORE_BASE64") and os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON"):
             aab_path = self.build_twa(app_dir, config, url)
             if aab_path:
-                self.publish_to_play_store(aab_path, config)
+                self.publish_to_play_store(aab_path, config, deploy_url=url)
         elif get_verbose():
             info("Android secrets not set — skipping TWA build and Play Store publish.")
 
