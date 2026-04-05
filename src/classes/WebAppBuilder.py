@@ -1052,8 +1052,176 @@ What would you add or improve? Drop a comment below 👇
             aab_path = self.build_twa(app_dir, config, url)
             if aab_path:
                 self.publish_to_play_store(aab_path, config, deploy_url=url)
+                # Submit to Testers Community for 14-day testing
+                play_store_url = f"https://play.google.com/store/apps/details?id={config.get('package_name', '')}"
+                self.submit_to_testers_community(config, play_store_url)
         elif get_verbose():
             info("Android secrets not set — skipping TWA build and Play Store publish.")
 
         success(f"Done! App fully live at: {url}")
         return url
+
+    def submit_to_testers_community(self, config: dict, play_store_url: str) -> bool:
+        """
+        Auto-submit app to testerscommunity.com using Selenium headless Chrome.
+        Requires TESTERS_COMMUNITY_EMAIL and TESTERS_COMMUNITY_PASSWORD secrets.
+        """
+        email = os.environ.get("TESTERS_COMMUNITY_EMAIL", "").strip()
+        password = os.environ.get("TESTERS_COMMUNITY_PASSWORD", "").strip()
+        if not email or not password:
+            warning("TESTERS_COMMUNITY_EMAIL/PASSWORD not set — skipping Testers Community submission.")
+            return False
+        if not play_store_url or "details?id=" not in play_store_url:
+            warning("Invalid Play Store URL — skipping Testers Community submission.")
+            return False
+
+        info("Submitting to testerscommunity.com...")
+        try:
+            import time
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.webdriver.support.ui import WebDriverWait
+
+            options = Options()
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--window-size=1280,900")
+
+            driver = webdriver.Chrome(options=options)
+            wait = WebDriverWait(driver, 20)
+
+            try:
+                # ── Step 1: Login ──────────────────────────────────────
+                driver.get("https://www.testerscommunity.com/login")
+                time.sleep(2)
+
+                # Find email + password fields (try common selectors)
+                for sel in ['input[type="email"]', 'input[name="email"]', '#email']:
+                    try:
+                        email_field = driver.find_element(By.CSS_SELECTOR, sel)
+                        email_field.clear()
+                        email_field.send_keys(email)
+                        break
+                    except Exception:
+                        pass
+
+                for sel in ['input[type="password"]', 'input[name="password"]', '#password']:
+                    try:
+                        pw_field = driver.find_element(By.CSS_SELECTOR, sel)
+                        pw_field.clear()
+                        pw_field.send_keys(password)
+                        break
+                    except Exception:
+                        pass
+
+                # Submit login form
+                for sel in ['button[type="submit"]', 'input[type="submit"]',
+                            '//button[contains(text(),"Login")]',
+                            '//button[contains(text(),"Sign in")]']:
+                    try:
+                        if sel.startswith("//"):
+                            btn = driver.find_element(By.XPATH, sel)
+                        else:
+                            btn = driver.find_element(By.CSS_SELECTOR, sel)
+                        btn.click()
+                        break
+                    except Exception:
+                        pass
+
+                time.sleep(3)
+                info(f"Testers Community: logged in, current URL: {driver.current_url}")
+
+                # ── Step 2: Navigate to submit / add app page ──────────
+                for submit_url in [
+                    "https://www.testerscommunity.com/dashboard/submit",
+                    "https://www.testerscommunity.com/dashboard/add-app",
+                    "https://www.testerscommunity.com/submit",
+                    "https://www.testerscommunity.com/dashboard/new",
+                ]:
+                    driver.get(submit_url)
+                    time.sleep(2)
+                    if "404" not in driver.title.lower() and driver.current_url == submit_url:
+                        break
+
+                # Also try clicking a submit/add button on dashboard
+                if "dashboard" in driver.current_url and "submit" not in driver.current_url:
+                    for xpath in [
+                        '//button[contains(text(),"Submit")]',
+                        '//a[contains(text(),"Submit")]',
+                        '//button[contains(text(),"Add App")]',
+                        '//a[contains(text(),"Add App")]',
+                        '//button[contains(text(),"New")]',
+                    ]:
+                        try:
+                            driver.find_element(By.XPATH, xpath).click()
+                            time.sleep(2)
+                            break
+                        except Exception:
+                            pass
+
+                info(f"Testers Community: submit page: {driver.current_url}")
+
+                # ── Step 3: Fill form ──────────────────────────────────
+                app_name = config["app_name"]
+                description = config.get("description", config.get("tagline", ""))[:500]
+
+                # App name
+                for sel in ['input[name="appName"]', 'input[name="name"]',
+                            'input[placeholder*="app name" i]', '#appName', '#name']:
+                    try:
+                        f = driver.find_element(By.CSS_SELECTOR, sel)
+                        f.clear(); f.send_keys(app_name); break
+                    except Exception:
+                        pass
+
+                # Play Store URL
+                for sel in ['input[name="playStoreUrl"]', 'input[name="storeUrl"]',
+                            'input[name="url"]', 'input[placeholder*="play" i]',
+                            'input[placeholder*="store" i]', '#playStoreUrl']:
+                    try:
+                        f = driver.find_element(By.CSS_SELECTOR, sel)
+                        f.clear(); f.send_keys(play_store_url); break
+                    except Exception:
+                        pass
+
+                # Description
+                for sel in ['textarea[name="description"]', 'textarea', '#description']:
+                    try:
+                        f = driver.find_element(By.CSS_SELECTOR, sel)
+                        f.clear(); f.send_keys(description); break
+                    except Exception:
+                        pass
+
+                time.sleep(1)
+
+                # Submit the form
+                for sel in ['button[type="submit"]', '//button[contains(text(),"Submit")]',
+                            '//button[contains(text(),"Add")]', '//button[contains(text(),"List")]']:
+                    try:
+                        if sel.startswith("//"):
+                            btn = driver.find_element(By.XPATH, sel)
+                        else:
+                            btn = driver.find_element(By.CSS_SELECTOR, sel)
+                        btn.click()
+                        time.sleep(3)
+                        break
+                    except Exception:
+                        pass
+
+                info(f"Testers Community: after submit URL: {driver.current_url}")
+                success(f"✅ Submitted to Testers Community: {app_name}")
+                return True
+
+            finally:
+                driver.quit()
+
+        except Exception as e:
+            warning(f"Testers Community submission failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
