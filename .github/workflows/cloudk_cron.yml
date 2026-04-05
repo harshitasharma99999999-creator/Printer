@@ -65,6 +65,14 @@ jobs:
       - name: Create .mp directory
         run: mkdir -p .mp
 
+      - name: Debug — check which secrets are present
+        run: |
+          echo "GROQ_API_KEY set:               ${{ secrets.GROQ_API_KEY != '' }}"
+          echo "GEMINI_API_KEY set:             ${{ secrets.GEMINI_API_KEY != '' }}"
+          echo "CLOUDK_INSTAGRAM_USERNAME set:  ${{ secrets.CLOUDK_INSTAGRAM_USERNAME != '' }}"
+          echo "CLOUDK_INSTAGRAM_PASSWORD set:  ${{ secrets.CLOUDK_INSTAGRAM_PASSWORD != '' }}"
+          echo "CLOUDK_INSTAGRAM_SESSION_JSON set: ${{ secrets.CLOUDK_INSTAGRAM_SESSION_JSON != '' }}"
+
       - name: Run Cloud Kitchen post pipeline
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

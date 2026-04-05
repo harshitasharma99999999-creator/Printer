@@ -7,6 +7,7 @@ import base64
 import os
 import random
 import textwrap
+import traceback
 from io import BytesIO
 from uuid import uuid4
 
@@ -20,7 +21,7 @@ from config import (
     get_verbose,
 )
 from llm_provider import generate_text
-from status import error, info, success, warning
+from status import info, success, warning
 
 SWIGGY  = "https://www.swiggy.com/direct/brand/745335?source=swiggy-direct&subSource=generic"
 ZOMATO  = "https://link.zomato.com/xqzv/rshare?id=12604070930563345"
@@ -71,39 +72,49 @@ class CloudKitchen:
             f"Write an Instagram caption for a cloud kitchen selling '{dish}'.\n\n"
             f"Structure (follow exactly):\n"
             f"Line 1: A bold mouth-watering headline about the dish (use relevant emoji)\n"
-            f"Line 2-3: (empty line then) 2-3 sentences about the specific health benefits "
-            f"of this dish — be specific (name vitamins, minerals, body benefits). "
+            f"Empty line\n"
+            f"Lines 2-3: 2-3 sentences about the specific health benefits "
+            f"of this dish — name vitamins, minerals, body benefits specifically. "
             f"Make the reader feel they NEED this for their health.\n"
-            f"Line 4: (empty line then) A warm, inviting closing sentence encouraging them to order today.\n\n"
-            f"Rules:\n"
-            f"- Conversational, warm, not corporate\n"
-            f"- Maximum 150 words\n"
-            f"- No hashtags (added separately)\n"
-            f"- No ordering links (added separately)\n"
-            f"- Return ONLY the caption text, nothing else"
+            f"Empty line\n"
+            f"Line 4: A warm closing sentence encouraging them to order today.\n\n"
+            f"Rules: conversational, warm, max 150 words, no hashtags, no ordering links.\n"
+            f"Return ONLY the caption text."
         )
-        caption = generate_text(prompt).strip()
-        if get_verbose():
-            info(f"CloudKitchen caption for {dish}: {caption[:60]}...")
-        return caption
+        try:
+            caption = generate_text(prompt).strip()
+            if get_verbose():
+                info(f"CloudKitchen caption for {dish}: {caption[:60]}...")
+            return caption
+        except Exception as e:
+            print(f"[CloudKitchen] Caption generation failed: {e}")
+            return f"🥗 Fresh & healthy {dish} — made with love, delivered to your door!"
 
     def generate_reel_script(self, dish: str) -> str:
         prompt = (
             f"Write a 5-sentence voiceover script for a 20-second Instagram Reel about '{dish}' "
-            f"from a healthy cloud kitchen.\n\n"
-            f"Style: warm, enthusiastic, health-coach energy — like a friend who genuinely "
-            f"wants you to eat better.\n"
-            f"Structure:\n"
-            f"- Sentence 1: Hook — a bold statement about health or the dish\n"
-            f"- Sentences 2-3: Specific health benefits (name real nutrients/effects)\n"
-            f"- Sentence 4: Describe how fresh and delicious this dish is\n"
-            f"- Sentence 5: Call to action — order now via Swiggy or Zomato\n\n"
-            f"Rules: No markdown, no bullets, 5 sentences only, spoken word style."
+            f"from a healthy cloud kitchen named Grand Forno.\n\n"
+            f"Style: warm, enthusiastic, health-coach energy.\n"
+            f"Sentence 1: Bold hook about health or this dish.\n"
+            f"Sentences 2-3: Specific health benefits with real nutrients/effects.\n"
+            f"Sentence 4: How fresh and delicious this dish is.\n"
+            f"Sentence 5: Call to action — order via Swiggy or Zomato.\n\n"
+            f"No markdown, no bullets, 5 sentences only, spoken word style."
         )
-        script = generate_text(prompt).strip()
-        if get_verbose():
-            info(f"CloudKitchen reel script for {dish}: {script[:60]}...")
-        return script
+        try:
+            script = generate_text(prompt).strip()
+            if get_verbose():
+                info(f"CloudKitchen reel script for {dish}: {script[:60]}...")
+            return script
+        except Exception as e:
+            print(f"[CloudKitchen] Script generation failed: {e}")
+            return (
+                f"Your body deserves the best fuel. "
+                f"Our {dish} is packed with vitamins, minerals and antioxidants "
+                f"that boost your energy and strengthen your immune system. "
+                f"Every ingredient is fresh, clean, and carefully chosen for your wellness. "
+                f"Order now on Swiggy or Zomato and taste the difference."
+            )
 
     # ------------------------------------------------------------------ #
     #  Image Generation                                                    #
@@ -112,7 +123,7 @@ class CloudKitchen:
     def generate_food_image(self, dish: str) -> bytes:
         api_key = get_nanobanana2_api_key()
         if not api_key:
-            error("GEMINI_API_KEY not set — cannot generate food image.")
+            print("[CloudKitchen] GEMINI_API_KEY not set — using fallback image.")
             return b""
 
         base_url = get_nanobanana2_api_base_url().rstrip("/")
@@ -153,22 +164,51 @@ class CloudKitchen:
                     mime = inline_data.get("mimeType") or inline_data.get("mime_type", "")
                     if data and str(mime).startswith("image/"):
                         return base64.b64decode(data)
-            warning("Gemini returned no image for food photo.")
+            print(f"[CloudKitchen] Gemini returned no image for '{dish}'.")
             return b""
         except Exception as e:
-            warning(f"Food image generation failed: {e}")
+            print(f"[CloudKitchen] Food image generation failed: {e}")
             return b""
 
     def save_food_image(self, img_bytes: bytes, dish: str) -> str:
-        """Save raw image bytes to .mp/, return path."""
-        from PIL import Image
+        from PIL import Image, ImageDraw, ImageFont
 
-        if not img_bytes:
-            # Fallback: solid fresh-green background
-            img = Image.new("RGB", (1080, 1080), (200, 230, 180))
-        else:
+        SIZE = 1080
+
+        if img_bytes:
             img = Image.open(BytesIO(img_bytes)).convert("RGB")
-            img = img.resize((1080, 1080), Image.LANCZOS)
+            img = img.resize((SIZE, SIZE), Image.LANCZOS)
+        else:
+            # Branded fallback: warm orange-to-green gradient (food/fresh brand colors)
+            img = Image.new("RGB", (SIZE, SIZE))
+            draw = ImageDraw.Draw(img)
+            for y in range(SIZE):
+                ratio = y / SIZE
+                r = int(230 * (1 - ratio) + 60 * ratio)
+                g = int(120 * (1 - ratio) + 180 * ratio)
+                b = int(40 * (1 - ratio) + 60 * ratio)
+                draw.line([(0, y), (SIZE, y)], fill=(r, g, b))
+
+            # Add dish name text on fallback
+            try:
+                font = ImageFont.truetype(
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 56
+                )
+            except Exception:
+                font = ImageFont.load_default()
+
+            wrapped = textwrap.fill(dish, width=18)
+            lines = wrapped.split("\n")
+            line_h = 68
+            total_h = line_h * len(lines)
+            y0 = (SIZE - total_h) // 2
+            for i, line in enumerate(lines):
+                bbox = draw.textbbox((0, 0), line, font=font)
+                tw = bbox[2] - bbox[0]
+                x = (SIZE - tw) // 2
+                y = y0 + i * line_h
+                draw.text((x + 3, y + 3), line, font=font, fill=(0, 0, 0, 160))
+                draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
 
         out_path = os.path.join(MP_DIR, f"cloudk_photo_{uuid4().hex[:8]}.jpg")
         img.save(out_path, "JPEG", quality=95)
@@ -181,46 +221,48 @@ class CloudKitchen:
     # ------------------------------------------------------------------ #
 
     def make_reel(self, dish: str, script: str) -> str:
-        """Create a ~20s food Reel: 4 food images + TTS voiceover."""
+        """Create a ~20s food Reel: 1 food image repeated + TTS voiceover."""
         from moviepy.editor import (
             AudioFileClip,
-            CompositeVideoClip,
             ImageClip,
             concatenate_videoclips,
         )
-
         from .Tts import TTS
 
-        # Generate TTS
+        # Generate image ONCE and reuse — avoids 4× Gemini API calls
+        print(f"[CloudKitchen] Generating food image for reel: {dish}")
+        img_bytes = self.generate_food_image(dish)
+        img_path = self.save_food_image(img_bytes, dish)
+
+        # TTS with fallback to silent reel
         wav_path = os.path.join(MP_DIR, f"cloudk_tts_{uuid4().hex[:8]}.wav")
-        TTS().synthesize(script, output_file=wav_path)
+        audio = None
+        duration = 20.0
+        try:
+            print("[CloudKitchen] Synthesizing TTS...")
+            TTS().synthesize(script, output_file=wav_path)
+            audio = AudioFileClip(wav_path)
+            duration = max(audio.duration + 0.5, 18.0)
+            print(f"[CloudKitchen] TTS done, duration: {duration:.1f}s")
+        except Exception as e:
+            print(f"[CloudKitchen] TTS failed: {e} — creating silent reel")
 
-        audio = AudioFileClip(wav_path)
-        duration = max(audio.duration + 0.5, 18.0)
         per_clip = duration / 4
-
         clips = []
         for _ in range(4):
-            img_bytes = self.generate_food_image(dish)
-            img_path = self.save_food_image(img_bytes, dish)
-            # Resize to 1080×1350 (4:5 portrait — best for Reels feed)
-            clip = (
-                ImageClip(img_path)
-                .set_duration(per_clip)
-                .resize(height=1350)
-            )
+            clip = ImageClip(img_path).set_duration(per_clip).resize(height=1350)
             w, h = clip.size
             if w > 1080:
                 clip = clip.crop(x_center=w / 2, width=1080)
             clips.append(clip)
 
         video = concatenate_videoclips(clips, method="compose")
-        video = video.set_audio(audio)
+        if audio:
+            video = video.set_audio(audio)
 
         out_path = os.path.join(MP_DIR, f"cloudk_reel_{uuid4().hex[:8]}.mp4")
         video.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
-        if get_verbose():
-            info(f"Food Reel created: {out_path}")
+        print(f"[CloudKitchen] Reel created: {out_path}")
         return out_path
 
     # ------------------------------------------------------------------ #
@@ -231,13 +273,15 @@ class CloudKitchen:
         username = os.environ.get("CLOUDK_INSTAGRAM_USERNAME", "").strip()
         password = os.environ.get("CLOUDK_INSTAGRAM_PASSWORD", "").strip()
         if not username or not password:
-            warning("CLOUDK_INSTAGRAM_USERNAME/PASSWORD not set — skipping.")
+            print("[CloudKitchen] CLOUDK_INSTAGRAM_USERNAME/PASSWORD not set — skipping.")
             return None, None
 
-        # Temporarily inject session JSON under the expected env var name
         session_json = os.environ.get("CLOUDK_INSTAGRAM_SESSION_JSON", "").strip()
         if session_json:
             os.environ["INSTAGRAM_SESSION_JSON"] = session_json
+            print("[CloudKitchen] Instagram session JSON loaded.")
+        else:
+            print("[CloudKitchen] WARNING: CLOUDK_INSTAGRAM_SESSION_JSON not set — will attempt fresh login.")
 
         from .Instagram import Instagram
         return Instagram(username, password), username
@@ -246,28 +290,30 @@ class CloudKitchen:
         ig, username = self._get_instagram()
         if not ig:
             return ""
-
         full_caption = f"{caption_body}{ORDER_BLOCK}\n\n{HASHTAGS}"
         try:
             url = ig.upload_photo(image_path, full_caption)
             success(f"Grand Forno photo posted: {url}")
+            print(f"[CloudKitchen] Photo posted: {url}")
             return url
         except Exception as e:
-            error(f"Grand Forno photo post failed: {e}")
+            print(f"[CloudKitchen] Photo post FAILED: {e}")
+            traceback.print_exc()
             return ""
 
     def post_reel(self, video_path: str, dish: str, caption_body: str) -> str:
         ig, username = self._get_instagram()
         if not ig:
             return ""
-
         full_caption = f"{caption_body}{ORDER_BLOCK}\n\n{HASHTAGS}"
         try:
             url = ig.upload_reel(video_path, full_caption)
             success(f"Grand Forno reel posted: {url}")
+            print(f"[CloudKitchen] Reel posted: {url}")
             return url
         except Exception as e:
-            error(f"Grand Forno reel post failed: {e}")
+            print(f"[CloudKitchen] Reel post FAILED: {e}")
+            traceback.print_exc()
             return ""
 
     # ------------------------------------------------------------------ #
@@ -277,22 +323,28 @@ class CloudKitchen:
     def run(self, dish: str = None, post_type: str = None):
         os.makedirs(MP_DIR, exist_ok=True)
 
-        if not dish:
-            item = random.choice(MENU_ITEMS)
-            dish, post_type = item[0], item[1]
-        info(f"CloudKitchen: {dish} ({post_type})")
+        try:
+            if not dish:
+                item = random.choice(MENU_ITEMS)
+                dish, post_type = item[0], item[1]
+            print(f"[CloudKitchen] Starting: {dish} ({post_type})")
 
-        if post_type == "reel":
-            script = self.generate_reel_script(dish)
-            caption_body = self.generate_caption(dish)
-            info("Creating food Reel...")
-            reel_path = self.make_reel(dish, script)
-            self.post_reel(reel_path, dish, caption_body)
-        else:
-            caption_body = self.generate_caption(dish)
-            info("Generating food image...")
-            img_bytes = self.generate_food_image(dish)
-            img_path = self.save_food_image(img_bytes, dish)
-            self.post_photo(img_path, dish, caption_body)
+            if post_type == "reel":
+                script = self.generate_reel_script(dish)
+                caption_body = self.generate_caption(dish)
+                print("[CloudKitchen] Creating food Reel...")
+                reel_path = self.make_reel(dish, script)
+                self.post_reel(reel_path, dish, caption_body)
+            else:
+                caption_body = self.generate_caption(dish)
+                print(f"[CloudKitchen] Generating food image for: {dish}")
+                img_bytes = self.generate_food_image(dish)
+                img_path = self.save_food_image(img_bytes, dish)
+                self.post_photo(img_path, dish, caption_body)
 
-        success(f"CloudKitchen run complete: {dish}")
+            success(f"CloudKitchen run complete: {dish}")
+            print(f"[CloudKitchen] Done: {dish}")
+
+        except Exception as e:
+            print(f"[CloudKitchen] run() crashed: {e}")
+            traceback.print_exc()
