@@ -207,7 +207,9 @@ Return ONLY a valid JSON object, no markdown, no explanation:
 
         keystore_path = os.path.join(tempfile.gettempdir(), "android_release.keystore")
         with open(keystore_path, "wb") as f:
-            f.write(base64.b64decode(keystore_b64))
+            # Add padding in case GitHub stripped trailing '=' from the secret
+            padded = keystore_b64 + "=" * (4 - len(keystore_b64) % 4)
+            f.write(base64.b64decode(padded))
 
         try:
             result = subprocess.run(
@@ -462,7 +464,8 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         # Write keystore file
         keystore_path = os.path.join(twa_dir, "release.keystore")
         with open(keystore_path, "wb") as f:
-            f.write(base64.b64decode(keystore_b64))
+            padded = keystore_b64 + "=" * (4 - len(keystore_b64) % 4)
+            f.write(base64.b64decode(padded))
 
         domain = deploy_url.replace("https://", "").replace("http://", "").rstrip("/")
         package_name = config.get("package_name", f"com.moneyprinter.{re.sub(r'[^a-z0-9]', '', config['app_slug'].lower())}")
