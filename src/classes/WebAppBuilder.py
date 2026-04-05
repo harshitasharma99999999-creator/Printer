@@ -245,8 +245,14 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         config["theme_color"] = theme_color
 
         # Compute Android package name and fingerprint
-        safe_slug = re.sub(r"[^a-z0-9]", "", config["app_slug"].lower().replace("-", ""))
-        package_name = f"com.moneyprinter.{safe_slug}"
+        # Use fixed package name from env if set (required for Play Store — same app every run)
+        # Otherwise derive from slug (changes daily, Play Store will reject after first upload)
+        fixed_pkg = os.environ.get("ANDROID_PACKAGE_NAME", "").strip()
+        if fixed_pkg:
+            package_name = fixed_pkg
+        else:
+            safe_slug = re.sub(r"[^a-z0-9]", "", config["app_slug"].lower().replace("-", ""))
+            package_name = f"com.moneyprinter.{safe_slug}"
         config["package_name"] = package_name
         fingerprint = self._get_android_fingerprint()
 
