@@ -93,12 +93,14 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/preflight_local.py
 
       - name: Run Shorts pipeline
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python src/cron.py youtube 944ff01c-c1ee-44f4-a59f-cb3f44b056c0
 
       - name: Upload to Instagram Reels

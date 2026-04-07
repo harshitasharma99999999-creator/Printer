@@ -97,6 +97,7 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           IDS=("afm-manifestation" "afm-spiritual" "afm-meditation")
           RANDOM_ID=${IDS[$RANDOM % ${#IDS[@]}]}
