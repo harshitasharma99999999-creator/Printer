@@ -5,6 +5,9 @@ on:
     - cron: "0 0 */50 * *"   # every 50 days
   workflow_dispatch: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   keepalive:
     runs-on: ubuntu-latest

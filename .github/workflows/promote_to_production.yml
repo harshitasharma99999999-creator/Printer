@@ -12,6 +12,9 @@ on:
         required: false
         default: "0.1"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   promote:
     runs-on: ubuntu-latest

@@ -5,9 +5,13 @@ on:
     - cron: "0 2,8,14,20 * * *"   # Every 6 hours (offset from Shorts)
   workflow_dispatch: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   post:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -62,9 +66,6 @@ jobs:
           cat > .mp/youtube.json << 'EOF'
           {"accounts": [{"id": "944ff01c-c1ee-44f4-a59f-cb3f44b056c0", "nickname": "universe", "firefox_profile": "", "niche": "reality shifting raise your vibration aura reading law of attraction manifesting 5D consciousness spiritual awakening", "language": "english", "videos": []}]}
           EOF
-
-      - name: Restore YouTube OAuth token
-        run: echo '${{ secrets.YOUTUBE_TOKEN_JSON }}' > token.json
 
       - name: Run image post pipeline
         env:
