@@ -1,10 +1,12 @@
 # RUN THIS N AMOUNT OF TIMES
+import argparse
+import os
 import sys
 import random
 
 from status import *
 from cache import get_accounts, get_products
-from config import get_verbose
+from config import get_verbose, get_ollama_model, get_groq_api_key
 from llm_provider import select_model
 
 SHORTS_NICHES = [
@@ -20,7 +22,51 @@ SHORTS_NICHES = [
     "spiritual awakening",
 ]
 
-def main():
+def _use_groq() -> bool:
+    return bool(os.environ.get("GROQ_API_KEY") or get_groq_api_key())
+
+
+def _ensure_llm_selected(model: str | None) -> None:
+    if _use_groq():
+        return
+
+    resolved = (model or get_ollama_model() or "").strip()
+    if not resolved:
+        error(
+            "No Ollama model configured.\n"
+            "- Set `ollama_model` in `config.json`, or\n"
+            "- Pass it as an argument: `python src/cron.py <purpose> <account_id> <model>`"
+        )
+        sys.exit(1)
+    select_model(resolved)
+
+
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run scheduled automations (YouTube, LongForm, Twitter, etc.)."
+    )
+    parser.add_argument(
+        "purpose",
+        choices=["twitter", "youtube", "afm", "longform", "ebook"],
+        help="What automation to run.",
+    )
+    parser.add_argument("account_id", help="Account UUID (or product id for afm).")
+    parser.add_argument(
+        "model",
+        nargs="?",
+        help="Ollama model name (optional if `ollama_model` is set in config.json, or if using Groq).",
+    )
+    parser.add_argument(
+        "niche",
+        nargs="?",
+        help="Longform niche (only used when purpose=longform).",
+    )
+    parser.add_argument("--model", dest="model_flag", help="Same as positional model.")
+    parser.add_argument("--niche", dest="niche_flag", help="Same as positional niche.")
+    return parser.parse_args(argv)
+
+
+def main() -> None:
     """Main function to post content to Twitter or upload videos to YouTube.
 
     This function determines its operation based on command-line arguments:
@@ -38,15 +84,13 @@ def main():
 
     Returns:
         None. The function performs operations based on the purpose and account UUID and does not return any value."""
-    purpose = str(sys.argv[1])
-    account_id = str(sys.argv[2])
-    model = str(sys.argv[3]) if len(sys.argv) > 3 else None
+    args = _parse_args(sys.argv[1:])
+    purpose = str(args.purpose)
+    account_id = str(args.account_id)
+    model = (args.model_flag or args.model)
+    niche = (args.niche_flag or args.niche)
 
-    if model:
-        select_model(model)
-    else:
-        error("No Ollama model specified. Pass model name as third argument.")
-        sys.exit(1)
+    _ensure_llm_selected(model)
 
     verbose = get_verbose()
 
@@ -96,7 +140,10 @@ def main():
                     acc["language"]
                 )
                 youtube.generate_video(tts)
-                youtube.upload_video()
+                ok = youtube.upload_video()
+                if not ok:
+                    error("YouTube upload failed (no video posted).")
+                    sys.exit(2)
                 if verbose:
                     success("Uploaded Short.")
                 break
@@ -126,15 +173,14 @@ def main():
                     )
                     youtube.set_subject(afm.product_title)
                     youtube.generate_video(tts)
-                    youtube.upload_video()
+                    ok = youtube.upload_video()
+                    if not ok:
+                        error("AFM YouTube upload failed (no video posted).")
+                        sys.exit(2)
                     if verbose:
                         success("Uploaded product Short.")
                 break
     elif purpose == "longform":
-        # argv: cron.py longform <account_id> <model> [niche]
-        # model already selected above via argv[3]
-        niche = str(sys.argv[4]) if len(sys.argv) > 4 else None
-
         accounts = get_accounts("youtube")
         if not account_id:
             error("Account UUID cannot be empty.")
@@ -153,7 +199,10 @@ def main():
                     chosen_niche,
                     acc.get("language", "English"),
                 )
-                lf.run()
+                result = lf.run()
+                if not result.get("url"):
+                    error("Long-form upload failed (no video posted).")
+                    sys.exit(2)
                 if verbose:
                     success("Long-form video uploaded.")
                 break

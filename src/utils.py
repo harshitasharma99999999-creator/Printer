@@ -1,5 +1,6 @@
 import os
 import random
+import time
 import zipfile
 import requests
 import platform
@@ -43,6 +44,65 @@ def build_url(youtube_video_id: str) -> str:
         url (str): The URL to the YouTube video.
     """
     return f"https://www.youtube.com/watch?v={youtube_video_id}"
+
+
+def _get_youtube_upload_timeout_sec() -> int:
+    raw = str(os.environ.get("YOUTUBE_UPLOAD_TIMEOUT_SEC", "7200")).strip()
+    try:
+        timeout = int(raw)
+        return timeout if timeout > 0 else 7200
+    except Exception:
+        return 7200
+
+
+def run_youtube_resumable_upload(request, *, verbose: bool, label: str) -> dict:
+    """
+    Runs a resumable YouTube Data API upload request until completion with retries.
+
+    Args:
+        request: googleapiclient upload request (from youtube.videos().insert(...)).
+        verbose: Whether to print progress logs.
+        label: Human label for logs (e.g. "Short" / "Long-form").
+
+    Returns:
+        dict: The final API response containing the uploaded video id, etc.
+    """
+    try:
+        from googleapiclient.errors import HttpError
+    except Exception:  # pragma: no cover
+        HttpError = None
+
+    started = time.time()
+    timeout_sec = _get_youtube_upload_timeout_sec()
+    last_progress = -1
+    response = None
+
+    while response is None:
+        if time.time() - started > timeout_sec:
+            raise TimeoutError(
+                f"{label} upload timed out after {timeout_sec}s. "
+                "Increase with env var YOUTUBE_UPLOAD_TIMEOUT_SEC."
+            )
+
+        try:
+            status, response = request.next_chunk(num_retries=5)
+            if status is not None and hasattr(status, "progress"):
+                progress = int(status.progress() * 100)
+                if verbose and progress != last_progress and progress % 5 == 0:
+                    info(f"{label} upload progress: {progress}%")
+                    last_progress = progress
+        except Exception as exc:
+            # Retry common transient API failures.
+            if HttpError is not None and isinstance(exc, HttpError):
+                code = getattr(getattr(exc, "resp", None), "status", None)
+                if code in (500, 502, 503, 504):
+                    if verbose:
+                        warning(f"{label} upload transient HTTP {code}; retrying...")
+                    time.sleep(5)
+                    continue
+            raise
+
+    return response
 
 
 def rem_temp_files() -> None:

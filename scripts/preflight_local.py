@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import shutil
 import sys
 from typing import Tuple
 
@@ -45,6 +46,21 @@ def main() -> int:
 
     ok(f"stt_provider={stt_provider}")
 
+    # LLM selection for unattended runs (cron/autopublish)
+    groq_key = (cfg.get("groq_api_key", "") or os.environ.get("GROQ_API_KEY", "")).strip()
+    ollama_model = str(cfg.get("ollama_model", "")).strip()
+    if groq_key:
+        ok("groq_api_key is set (Groq mode)")
+    else:
+        if ollama_model:
+            ok(f"ollama_model is set: {ollama_model}")
+        else:
+            fail(
+                "No LLM configured for unattended runs. "
+                "Set `ollama_model` in config.json (or set GROQ_API_KEY / groq_api_key)."
+            )
+            failures += 1
+
     imagemagick_path = cfg.get("imagemagick_path", "")
     if imagemagick_path and os.path.exists(imagemagick_path):
         ok(f"imagemagick_path exists: {imagemagick_path}")
@@ -63,23 +79,24 @@ def main() -> int:
     else:
         warn("firefox_profile is empty. Twitter/YouTube automation requires this.")
 
-    # Ollama (LLM)
-    base = str(cfg.get("ollama_base_url", "http://127.0.0.1:11434")).rstrip("/")
-    reachable, detail = check_url(f"{base}/api/tags")
-    if not reachable:
-        fail(f"Ollama is not reachable at {base}: {detail}")
-        failures += 1
-    else:
-        ok(f"Ollama reachable at {base}")
-        try:
-            tags = requests.get(f"{base}/api/tags", timeout=5).json()
-            models = [m.get("name") for m in tags.get("models", [])]
-            if models:
-                ok(f"Ollama models available: {', '.join(models[:10])}")
-            else:
-                warn("No models found on Ollama. Pull a model first (e.g. 'ollama pull llama3.2:3b').")
-        except Exception as exc:
-            warn(f"Could not validate Ollama model list: {exc}")
+    # Ollama (LLM) - only required when not using Groq
+    if not groq_key:
+        base = str(cfg.get("ollama_base_url", "http://127.0.0.1:11434")).rstrip("/")
+        reachable, detail = check_url(f"{base}/api/tags")
+        if not reachable:
+            fail(f"Ollama is not reachable at {base}: {detail}")
+            failures += 1
+        else:
+            ok(f"Ollama reachable at {base}")
+            try:
+                tags = requests.get(f"{base}/api/tags", timeout=5).json()
+                models = [m.get("name") for m in tags.get("models", [])]
+                if models:
+                    ok(f"Ollama models available: {', '.join(models[:10])}")
+                else:
+                    warn("No models found on Ollama. Pull a model first (e.g. 'ollama pull llama3.2:3b').")
+            except Exception as exc:
+                warn(f"Could not validate Ollama model list: {exc}")
 
     # Nano Banana 2 (image generation)
     api_key = cfg.get("nanobanana2_api_key", "") or os.environ.get("GEMINI_API_KEY", "")
@@ -109,6 +126,23 @@ def main() -> int:
         except Exception as exc:
             fail(f"faster-whisper is not importable: {exc}")
             failures += 1
+
+    # ffmpeg (required for MoviePy + long-form subtitle burn)
+    if shutil.which("ffmpeg"):
+        ok("ffmpeg is available on PATH")
+    else:
+        fail("ffmpeg not found on PATH. Video rendering/upload pipelines will fail.")
+        failures += 1
+
+    # YouTube auth (required for uploads)
+    if os.environ.get("YOUTUBE_TOKEN_JSON"):
+        ok("YOUTUBE_TOKEN_JSON is set")
+    else:
+        token_path = os.path.join(ROOT_DIR, "token.json")
+        if os.path.exists(token_path):
+            ok(f"YouTube token file found: {token_path}")
+        else:
+            warn("YouTube token not found (token.json / YOUTUBE_TOKEN_JSON). Uploads will fail until auth is set up.")
 
     if failures:
         print("")

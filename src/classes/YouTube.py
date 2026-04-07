@@ -806,9 +806,11 @@ Subject: {self.subject}"""
 
             if verbose:
                 info("Uploading Short to YouTube...")
-            response = None
-            while response is None:
-                _, response = request.next_chunk()
+            response = run_youtube_resumable_upload(
+                request,
+                verbose=verbose,
+                label="Short",
+            )
 
             video_id = response["id"]
             url = build_url(video_id)

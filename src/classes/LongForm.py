@@ -601,6 +601,7 @@ class LongForm:
     def upload_video(self) -> str:
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaFileUpload
+        from utils import run_youtube_resumable_upload
 
         try:
             creds = self._get_yt_credentials()
@@ -624,9 +625,11 @@ class LongForm:
 
             if get_verbose():
                 info("Uploading video to YouTube...")
-            response = None
-            while response is None:
-                _, response = request.next_chunk()
+            response = run_youtube_resumable_upload(
+                request,
+                verbose=get_verbose(),
+                label="Long-form",
+            )
 
             video_id = response["id"]
             video_url = f"https://youtube.com/watch?v={video_id}"
