@@ -161,6 +161,16 @@ def format_youtube_http_error(exc) -> str:
             "regenerate `YOUTUBE_TOKEN_JSON`."
         )
 
+    if status == 403 and reason == "insufficientPermissions":
+        return (
+            "YouTube upload failed: the OAuth token does not have the required upload scope.\n"
+            "- Re-generate `YOUTUBE_TOKEN_JSON` using `python scripts/setup_youtube_auth.py` (it must request "
+            "`https://www.googleapis.com/auth/youtube.upload`).\n"
+            "- Update the GitHub secret `YOUTUBE_TOKEN_JSON` with the new token.\n"
+            "- Re-run the workflow.\n"
+            "Tip: make sure you sign in with the same Google account that owns the target YouTube channel."
+        )
+
     if status and reason:
         return f"YouTube upload failed: HTTP {status} ({reason}): {message}"
     if status:
@@ -179,6 +189,17 @@ def preflight_youtube_api(creds, *, verbose: bool) -> None:
     from googleapiclient.errors import HttpError
 
     try:
+        # Scope check: channels().list can succeed on readonly tokens; uploads require youtube.upload.
+        required_scopes = ["https://www.googleapis.com/auth/youtube.upload"]
+        has_scopes = getattr(creds, "has_scopes", None)
+        if callable(has_scopes) and not creds.has_scopes(required_scopes):
+            raise RuntimeError(
+                "YouTube upload scope missing from credentials.\n"
+                "- Re-generate `YOUTUBE_TOKEN_JSON` using `python scripts/setup_youtube_auth.py`.\n"
+                "- Ensure the consent screen grants `youtube.upload`.\n"
+                "- Update the GitHub secret and re-run."
+            )
+
         youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
         youtube.channels().list(part="id", mine=True).execute()
         if verbose:
