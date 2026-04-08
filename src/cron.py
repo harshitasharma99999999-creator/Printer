@@ -118,6 +118,7 @@ def main() -> None:
     elif purpose == "youtube":
         from classes.Tts import TTS
         from classes.YouTube import YouTube
+        from utils import preflight_youtube_api
         tts = TTS()
 
         accounts = get_accounts("youtube")
@@ -129,6 +130,12 @@ def main() -> None:
             if acc["id"] == account_id:
                 if verbose:
                     info("Initializing YouTube...")
+                # Fail fast on auth/API configuration before doing expensive generation.
+                try:
+                    preflight_youtube_api(YouTube._get_yt_credentials(), verbose=verbose)
+                except Exception as exc:
+                    error(str(exc))
+                    sys.exit(2)
                 niche = random.choice(SHORTS_NICHES)
                 if verbose:
                     info(f"Random niche selected: {niche}")
@@ -164,6 +171,12 @@ def main() -> None:
                     from classes.Tts import TTS
                     tts = TTS()
                     from classes.YouTube import YouTube
+                    from utils import preflight_youtube_api
+                    try:
+                        preflight_youtube_api(YouTube._get_yt_credentials(), verbose=verbose)
+                    except Exception as exc:
+                        error(str(exc))
+                        sys.exit(2)
                     youtube = YouTube(
                         yt_account["id"],
                         yt_account["nickname"],
@@ -187,10 +200,17 @@ def main() -> None:
             sys.exit(1)
 
         from classes.LongForm import LongForm, LONG_FORM_NICHES
+        from utils import preflight_youtube_api
         for acc in accounts:
             if acc["id"] == account_id:
                 if verbose:
                     info("Initializing LongForm...")
+                # Fail fast on auth/API configuration before doing expensive generation.
+                try:
+                    preflight_youtube_api(LongForm._get_yt_credentials(), verbose=verbose)
+                except Exception as exc:
+                    error(str(exc))
+                    sys.exit(2)
                 chosen_niche = niche if niche else random.choice(LONG_FORM_NICHES)
                 lf = LongForm(
                     acc["id"],

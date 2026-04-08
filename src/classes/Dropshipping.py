@@ -291,12 +291,64 @@ class Dropshipping:
         )
         price_cents = int(float(product.get("price", 9.99)) * 100)
 
+        def _upload_info_pdf(product_id: str) -> None:
+            """
+            Gumroad is more reliable when a product has a deliverable file.
+            For dropshipping we attach a tiny PDF "info card" (no private data).
+            """
+            try:
+                from reportlab.lib.pagesizes import letter
+                from reportlab.lib.units import inch
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+                from reportlab.lib.styles import getSampleStyleSheet
+                from reportlab.lib.styles import ParagraphStyle
+                from reportlab.lib.enums import TA_LEFT
+
+                out_path = os.path.join(ROOT_DIR, ".mp", f"gumroad-info-{product_id}.pdf")
+                doc = SimpleDocTemplate(
+                    out_path,
+                    pagesize=letter,
+                    rightMargin=inch,
+                    leftMargin=inch,
+                    topMargin=inch,
+                    bottomMargin=inch,
+                )
+                styles = getSampleStyleSheet()
+                body_s = ParagraphStyle(
+                    "Body",
+                    parent=styles["Normal"],
+                    fontSize=11,
+                    leading=15,
+                    alignment=TA_LEFT,
+                )
+                story = [
+                    Paragraph(title, styles["Title"]),
+                    Spacer(1, 0.2 * inch),
+                    Paragraph("What this is:", body_s),
+                    Paragraph("A curated product card with specs + source link.", body_s),
+                    Spacer(1, 0.15 * inch),
+                    Paragraph(f"Source link: {product.get('aliexpress_url', '')}", body_s),
+                ]
+                doc.build(story)
+
+                with open(out_path, "rb") as f:
+                    requests.post(
+                        f"{base}/products/{product_id}/product_files",
+                        data={"access_token": access_token},
+                        files={"file": (os.path.basename(out_path), f, "application/pdf")},
+                        timeout=60,
+                    )
+            except Exception as _e:
+                if get_verbose():
+                    warning(f"Dropshipping: Gumroad info PDF upload failed ({_e}).")
+
         try:
             r = requests.post(f"{base}/products", data={
                 "access_token": access_token,
                 "name": title,
                 "price": price_cents,
                 "description": description[:2000],
+                "published": "true",
             }, timeout=20)
 
             if not r.ok:
@@ -308,14 +360,40 @@ class Dropshipping:
             product_id = product_data.get("id", "")
             product_url = product_data.get("short_url", f"https://app.gumroad.com/products/{product_id}")
 
-            # Publish immediately
-            requests.put(f"{base}/products/{product_id}", data={
-                "access_token": access_token,
-                "published": "true",
-            }, timeout=15)
+            if not product_id:
+                if get_verbose():
+                    warning("Dropshipping: Gumroad create returned no product id.")
+                return ""
+
+            _upload_info_pdf(product_id)
+
+            # Publish immediately (and verify)
+            pub_payloads = [
+                {"access_token": access_token, "published": "true"},
+                {"access_token": access_token, "published": "1"},
+            ]
+            pub_ok = False
+            pub_resp = None
+            for payload in pub_payloads:
+                try:
+                    pub_resp = requests.put(
+                        f"{base}/products/{product_id}",
+                        data=payload,
+                        timeout=15,
+                    )
+                    if pub_resp.ok:
+                        pub_ok = True
+                        break
+                except Exception:
+                    continue
+            if not pub_ok and get_verbose() and pub_resp is not None:
+                warning(f"Dropshipping: Gumroad publish failed: {pub_resp.status_code} {pub_resp.text[:200]}")
 
             if get_verbose():
-                success(f"Dropshipping: Gumroad listing live → {product_url}")
+                if pub_ok:
+                    success(f"Dropshipping: Gumroad listing published → {product_url}")
+                else:
+                    warning(f"Dropshipping: Gumroad listing created but may be Unpublished → {product_url}")
             return product_url
 
         except Exception as e:

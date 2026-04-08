@@ -29,10 +29,10 @@ except ImportError as e:
 
 # ── Config ──────────────────────────────────────────────────────────────────
 import os as _os
-AMAZON_EMAIL    = "harshitasharma99999999@gmail.com"
-AMAZON_PASSWORD = "@ABC123xyz"
-GITHUB_TOKEN    = _os.environ.get("GITHUB_PAT", "")
-GITHUB_REPO     = "harshitasharma99999999-creator/Printer"
+AMAZON_EMAIL = _os.environ.get("AMAZON_EMAIL", "").strip()
+AMAZON_PASSWORD = _os.environ.get("AMAZON_PASSWORD", "").strip()
+GITHUB_TOKEN = _os.environ.get("GITHUB_PAT", "").strip()
+GITHUB_REPO = _os.environ.get("GITHUB_REPO", "").strip()
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -69,9 +69,37 @@ def main():
     print("Opening Chrome for Amazon 2FA setup...")
     print("A browser window will appear — follow the prompts.\n")
 
+    global AMAZON_EMAIL, AMAZON_PASSWORD, GITHUB_REPO, GITHUB_TOKEN
+    if not AMAZON_EMAIL:
+        AMAZON_EMAIL = input("Amazon email (AMAZON_EMAIL): ").strip()
+    if not AMAZON_PASSWORD:
+        AMAZON_PASSWORD = input("Amazon password (AMAZON_PASSWORD): ").strip()
+    if not GITHUB_REPO:
+        GITHUB_REPO = input("GitHub repo (GITHUB_REPO, e.g. owner/repo): ").strip()
+    if not GITHUB_TOKEN:
+        GITHUB_TOKEN = input("GitHub PAT (GITHUB_PAT): ").strip()
+
+    if not (AMAZON_EMAIL and AMAZON_PASSWORD and GITHUB_REPO and GITHUB_TOKEN):
+        print("Missing required config. Set env vars AMAZON_EMAIL, AMAZON_PASSWORD, GITHUB_REPO, GITHUB_PAT.")
+        return
+
     options = uc.ChromeOptions()
     options.add_argument("--window-size=1280,900")
-    driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
+
+    def _chrome_major_version():
+        try:
+            out = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True).stdout
+            return int(out.strip().split()[2].split(".")[0])
+        except Exception:
+            return None
+
+    chrome_ver = _chrome_major_version()
+    driver = uc.Chrome(
+        options=options,
+        headless=False,
+        use_subprocess=True,
+        **({"version_main": chrome_ver} if chrome_ver else {}),
+    )
 
     try:
         # ── Login ──────────────────────────────────────────────────────────

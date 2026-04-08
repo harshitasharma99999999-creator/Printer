@@ -103,11 +103,19 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python src/cron.py youtube 944ff01c-c1ee-44f4-a59f-cb3f44b056c0
 
+      - name: Upload generated video artifact (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shorts-output
+          path: .mp/*.mp4
+          if-no-files-found: ignore
+
       - name: Upload to Instagram Reels
-        continue-on-error: true
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
           INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
           INSTAGRAM_SESSION_JSON: ${{ secrets.INSTAGRAM_SESSION_JSON }}
+          INSTAGRAM_VIDEO_PATH: ".mp/last_short.mp4"
         run: python src/instagram_runner.py

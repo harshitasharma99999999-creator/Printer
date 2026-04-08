@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sys
+import re
 from typing import Tuple
 
 import requests
@@ -143,6 +144,69 @@ def main() -> int:
             ok(f"YouTube token file found: {token_path}")
         else:
             warn("YouTube token not found (token.json / YOUTUBE_TOKEN_JSON). Uploads will fail until auth is set up.")
+
+    # YouTube Data API enabled + token works (required for uploads)
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
+
+        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
+        token_path = os.path.join(ROOT_DIR, "token.json")
+
+        creds = None
+        if token_json:
+            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+        elif os.path.exists(token_path):
+            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+
+        if creds is not None:
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+
+            youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+            try:
+                resp = youtube.channels().list(part="id", mine=True).execute()
+                chan_id = ""
+                items = resp.get("items") or []
+                if items:
+                    chan_id = str(items[0].get("id") or "")
+                ok(f"YouTube API access OK (channel_id={chan_id or 'unknown'})")
+            except HttpError as exc:
+                raw = ""
+                reason = ""
+                msg = str(exc)
+                try:
+                    raw = exc.content.decode("utf-8", errors="replace")
+                    payload = json.loads(raw)
+                    msg = payload.get("error", {}).get("message", msg)
+                    errors = payload.get("error", {}).get("errors", []) or []
+                    if errors:
+                        reason = str(errors[0].get("reason") or "")
+                except Exception:
+                    pass
+
+                project_number = ""
+                m = re.search(r"project\\s+(\\d+)", msg)
+                if m:
+                    project_number = m.group(1)
+
+                if reason == "accessNotConfigured":
+                    fail(
+                        "YouTube Data API v3 is disabled (or never enabled) for the Google Cloud project "
+                        f"{project_number or '(unknown)'} used by your OAuth client.\n"
+                        "Enable `YouTube Data API v3` in that project, wait a few minutes, then re-run. "
+                        "If you don't have access to that project, create a new OAuth client in a project you own "
+                        "and regenerate `YOUTUBE_TOKEN_JSON`."
+                    )
+                else:
+                    fail(f"YouTube API access failed: {reason or msg}")
+                failures += 1
+    except Exception as exc:
+        # Don't hard-fail preflight if the deps aren't installed (e.g., before pip install).
+        warn(f"Skipped YouTube API access check: {exc}")
 
     if failures:
         print("")

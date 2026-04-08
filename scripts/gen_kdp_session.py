@@ -10,9 +10,11 @@ import sys
 import time
 
 try:
-    import undetected_chromedriver as uc
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
 except ImportError:
-    print("Install undetected-chromedriver first: pip install undetected-chromedriver")
+    print("Install selenium first: pip install selenium")
     sys.exit(1)
 
 
@@ -20,9 +22,9 @@ def main():
     print("Opening KDP login in a visible browser window.")
     print("Log in manually (complete any 2FA/OTP), then press Enter here when done.\n")
 
-    options = uc.ChromeOptions()
+    options = Options()
     options.add_argument("--window-size=1280,800")
-    driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
+    driver = webdriver.Chrome(service=Service(), options=options)
 
     driver.get("https://kdp.amazon.com/")
     print("Browser opened. Please log in to KDP now...")

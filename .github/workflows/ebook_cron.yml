@@ -23,8 +23,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y libjpeg-dev zlib1g-dev libpng-dev
-          google-chrome --version
-          chromedriver --version
+          sudo apt-get install -y google-chrome-stable || \
+          (wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+           sudo apt install -y ./google-chrome-stable_current_amd64.deb) || true
+          google-chrome --version || true
+          chromedriver --version || true
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
@@ -89,7 +92,23 @@ jobs:
           KDP_PASSWORD: ${{ secrets.KDP_PASSWORD }}
           KDP_TOTP_SECRET: ${{ secrets.KDP_TOTP_SECRET }}
           KDP_SESSION_JSON: ${{ secrets.KDP_SESSION_JSON }}
+          KDP_PUBLISH_PAPERBACK: "true"
+          KDP_PUBLISH_HARDCOVER: "true"
+          REQUIRE_KDP_PUBLISH: "true"
+          KDP_PRINT_TRIM_SIZE: "6x9"
+          KDP_PRINT_PAPER: "cream"
           NO_PROXY: "*"
           HTTP_PROXY: ""
           HTTPS_PROXY: ""
         run: python src/cron.py ebook dummy-id groq
+
+      - name: Upload debug artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebook-debug
+          path: |
+            .mp/*.png
+            .mp/*.pdf
+            .mp/*.epub
+          if-no-files-found: ignore

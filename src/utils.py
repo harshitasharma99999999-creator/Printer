@@ -105,6 +105,88 @@ def run_youtube_resumable_upload(request, *, verbose: bool, label: str) -> dict:
     return response
 
 
+def _parse_google_http_error(exc) -> dict:
+    """
+    Best-effort parse of googleapiclient.errors.HttpError.
+
+    Returns:
+        dict with keys: status (int|None), reason (str), message (str)
+    """
+    import json as _json
+
+    status = getattr(getattr(exc, "resp", None), "status", None)
+    reason = ""
+    message = str(exc)
+
+    content = getattr(exc, "content", None)
+    if content:
+        try:
+            raw = content.decode("utf-8", errors="replace")
+            payload = _json.loads(raw)
+            err = payload.get("error", {}) if isinstance(payload, dict) else {}
+            message = err.get("message", message)
+            errors = err.get("errors", []) or []
+            if errors and isinstance(errors, list):
+                reason = str(errors[0].get("reason") or "")
+        except Exception:
+            pass
+
+    return {"status": status, "reason": reason, "message": message}
+
+
+def format_youtube_http_error(exc) -> str:
+    """
+    Formats a YouTube Data API HttpError into an actionable message.
+    """
+    import re as _re
+
+    parsed = _parse_google_http_error(exc)
+    status = parsed.get("status")
+    reason = (parsed.get("reason") or "").strip()
+    message = (parsed.get("message") or "").strip()
+
+    project_number = ""
+    m = _re.search(r"project\\s+(\\d+)", message)
+    if m:
+        project_number = m.group(1)
+
+    if status == 403 and reason == "accessNotConfigured":
+        return (
+            "YouTube upload failed: YouTube Data API v3 is disabled (or never enabled) for the Google Cloud project "
+            f"{project_number or '(unknown)'} used by your OAuth client.\n"
+            "- Enable `YouTube Data API v3` in that Google Cloud project.\n"
+            "- Wait ~5–10 minutes for it to propagate.\n"
+            "- Re-run the workflow.\n"
+            "If you don't have access to that project, create a new OAuth client in a project you own and "
+            "regenerate `YOUTUBE_TOKEN_JSON`."
+        )
+
+    if status and reason:
+        return f"YouTube upload failed: HTTP {status} ({reason}): {message}"
+    if status:
+        return f"YouTube upload failed: HTTP {status}: {message}"
+    return f"YouTube upload failed: {message or str(exc)}"
+
+
+def preflight_youtube_api(creds, *, verbose: bool) -> None:
+    """
+    Fast check that the token works and YouTube Data API is enabled.
+
+    Raises:
+        RuntimeError on failure with a human-readable message.
+    """
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+
+    try:
+        youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+        youtube.channels().list(part="id", mine=True).execute()
+        if verbose:
+            info("YouTube API preflight OK.")
+    except HttpError as exc:
+        raise RuntimeError(format_youtube_http_error(exc)) from exc
+
+
 def rem_temp_files() -> None:
     """
     Removes temporary files in the `.mp` directory.

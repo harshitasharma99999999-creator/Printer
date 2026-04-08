@@ -232,6 +232,23 @@ class LongForm:
         if affiliate:
             description += f"\n\n🛒 Recommended:\n{affiliate}"
 
+        # Add a matching eBook CTA (if available)
+        try:
+            from marketing import build_youtube_description, get_latest_ebook_url
+
+            mp_dir = os.path.join(ROOT_DIR, ".mp")
+            ebook_url = get_latest_ebook_url(mp_dir)
+            description = build_youtube_description(
+                base_description=description,
+                topic=self.subject,
+                ebook_url=ebook_url,
+                affiliate_link=affiliate,
+                include_disclosure=True,
+                is_shorts=False,
+            )
+        except Exception:
+            pass
+
         self.metadata = {"title": title, "description": description}
         return self.metadata
 
@@ -600,12 +617,14 @@ class LongForm:
 
     def upload_video(self) -> str:
         from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
         from googleapiclient.http import MediaFileUpload
         from utils import run_youtube_resumable_upload
+        from utils import format_youtube_http_error
 
         try:
             creds = self._get_yt_credentials()
-            youtube = build("youtube", "v3", credentials=creds)
+            youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
 
             body = {
                 "snippet": {
@@ -650,6 +669,12 @@ class LongForm:
 
             return video_url
 
+        except HttpError as e:
+            warning(format_youtube_http_error(e))
+            if get_verbose():
+                import traceback
+                traceback.print_exc()
+            return ""
         except Exception as e:
             import traceback
             warning(f"Long-form upload error: {e}")

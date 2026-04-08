@@ -29,3 +29,4 @@ instagrapi
 pyotp
 tweepy
 praw
+pypdf

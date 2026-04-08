@@ -68,21 +68,29 @@ class EBook:
         self.keywords: list[str] = []
         self.chapters: list[dict] = []   # [{title, body}, ...]
         self.pdf_path: str = ""
+        self.print_pdf_path: str = ""
         self.epub_path: str = ""
         self.cover_path: str = ""
+        self.print_cover_path: str = ""
+        self.print_cover_pdf_path: str = ""
         self.slug: str = ""
 
     # ------------------------------------------------------------------
     # Step 3b: Generate cover image
     # ------------------------------------------------------------------
 
-    def generate_cover_image(self) -> str:
-        """Generate a simple ebook cover image with PIL. Returns path."""
+    def generate_cover_image(
+        self,
+        *,
+        width: int = 1600,
+        height: int = 2400,
+        out_path: Optional[str] = None,
+    ) -> str:
+        """Generate a simple cover image with PIL. Returns path."""
         try:
             from PIL import Image, ImageDraw, ImageFont
             import textwrap as _tw
 
-            width, height = 1600, 2400
             img = Image.new("RGB", (width, height))
             draw = ImageDraw.Draw(img)
 
@@ -149,7 +157,7 @@ class EBook:
             draw.text(((width - tw) // 2, height - 220), author_text,
                       fill=(255, 215, 0), font=font_author)
 
-            cover_path = os.path.join(ROOT_DIR, ".mp", f"ebook-cover-{self.slug}.png")
+            cover_path = out_path or os.path.join(ROOT_DIR, ".mp", f"ebook-cover-{self.slug}.png")
             img.save(cover_path, "PNG")
             if get_verbose():
                 info(f"Cover image saved: {cover_path}")
@@ -157,6 +165,177 @@ class EBook:
         except Exception as e:
             if get_verbose():
                 warning(f"Cover image generation failed: {e}")
+            return ""
+
+    # ------------------------------------------------------------------
+    # Step 4a2: Format as Print PDF (Paperback/Hardcover)
+    # ------------------------------------------------------------------
+
+    def format_print_pdf(self, *, trim_size: str = "6x9") -> str:
+        """
+        Generate a print-friendly interior PDF for KDP paperback/hardcover.
+        This is best-effort and may still require KDP preview fixes depending on content.
+        """
+        import re as _re
+
+        def _safe_para(text: str) -> str:
+            return _re.sub(r"<[^>]+>", "", text).strip()
+
+        mp_dir = os.path.join(ROOT_DIR, ".mp")
+        os.makedirs(mp_dir, exist_ok=True)
+        path = os.path.join(mp_dir, f"ebook-print-{self.slug}.pdf")
+
+        trim = (trim_size or "").lower().replace(" ", "")
+        if trim == "6x9":
+            page_w, page_h = (6 * inch, 9 * inch)
+        elif trim == "5x8":
+            page_w, page_h = (5 * inch, 8 * inch)
+        else:
+            page_w, page_h = (6 * inch, 9 * inch)
+
+        doc = SimpleDocTemplate(
+            path,
+            pagesize=(page_w, page_h),
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=0.85 * inch,
+            bottomMargin=0.85 * inch,
+        )
+
+        styles = getSampleStyleSheet()
+        accent = HexColor("#1a1a1a")
+        light = HexColor("#555555")
+
+        title_style = ParagraphStyle(
+            "PrintCoverTitle",
+            parent=styles["Title"],
+            fontSize=22,
+            textColor=accent,
+            alignment=TA_CENTER,
+            spaceAfter=14,
+        )
+        author_style = ParagraphStyle(
+            "PrintAuthor",
+            parent=styles["Normal"],
+            fontSize=11,
+            textColor=light,
+            alignment=TA_CENTER,
+            spaceAfter=6,
+        )
+        ch_title_style = ParagraphStyle(
+            "PrintChTitle",
+            parent=styles["Heading1"],
+            fontSize=14,
+            textColor=accent,
+            spaceBefore=14,
+            spaceAfter=10,
+        )
+        body_style = ParagraphStyle(
+            "PrintBody",
+            parent=styles["Normal"],
+            fontSize=10,
+            leading=14,
+            spaceAfter=7,
+        )
+
+        story = []
+        story.append(Spacer(1, 1.0 * inch))
+        story.append(Paragraph(self.title, title_style))
+        story.append(Spacer(1, 0.2 * inch))
+        story.append(Paragraph(f"By {get_ebook_author()}", author_style))
+        story.append(PageBreak())
+
+        if self.description.strip():
+            story.append(Paragraph("About This Book", ch_title_style))
+            for para in self.description.split("\n"):
+                if para.strip():
+                    story.append(Paragraph(_safe_para(para.strip()), body_style))
+            story.append(PageBreak())
+
+        for i, ch in enumerate(self.chapters, 1):
+            story.append(Paragraph(f"Chapter {i}: {ch['title']}", ch_title_style))
+            story.append(Spacer(1, 0.08 * inch))
+            for para in ch["body"].split("\n"):
+                if para.strip():
+                    story.append(Paragraph(_safe_para(para.strip()), body_style))
+            if i != len(self.chapters):
+                story.append(PageBreak())
+
+        doc.build(story)
+        self.print_pdf_path = path
+        if get_verbose():
+            success(f"Print PDF saved: {path}")
+        return path
+
+    def generate_print_cover_pdf(
+        self,
+        *,
+        trim_size: str = "6x9",
+        paper: str = "cream",
+        bleed_in: float = 0.125,
+    ) -> str:
+        """
+        Generates a simple full-wrap cover PDF (back + spine + front) for KDP print.
+        Uses the generated `print_cover_path` as the front cover image and leaves the back blank.
+        """
+        if not (self.print_cover_path and os.path.exists(self.print_cover_path)):
+            return ""
+        if not (self.print_pdf_path and os.path.exists(self.print_pdf_path)):
+            return ""
+
+        try:
+            from pypdf import PdfReader
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.utils import ImageReader
+
+            mp_dir = os.path.join(ROOT_DIR, ".mp")
+            os.makedirs(mp_dir, exist_ok=True)
+            out_path = os.path.join(mp_dir, f"ebook-print-cover-wrap-{self.slug}.pdf")
+
+            trim = (trim_size or "").lower().replace(" ", "")
+            if trim == "6x9":
+                trim_w_in, trim_h_in = 6.0, 9.0
+            elif trim == "5x8":
+                trim_w_in, trim_h_in = 5.0, 8.0
+            else:
+                trim_w_in, trim_h_in = 6.0, 9.0
+
+            pages = len(PdfReader(self.print_pdf_path).pages)
+            paper_l = (paper or "").lower().strip()
+            # Rough KDP spine approximations (good enough for auto-generated interiors)
+            if paper_l == "white":
+                per_page = 0.002252
+            else:
+                per_page = 0.0025
+            spine_in = max(0.06, pages * per_page)
+
+            bleed = float(bleed_in)
+            total_w_in = (trim_w_in * 2.0) + spine_in + (bleed * 2.0)
+            total_h_in = trim_h_in + (bleed * 2.0)
+
+            c = canvas.Canvas(out_path, pagesize=(total_w_in * inch, total_h_in * inch))
+
+            # Front cover image on the right
+            front_x = (trim_w_in + spine_in + bleed) * inch
+            front_y = bleed * inch
+            c.drawImage(
+                ImageReader(self.print_cover_path),
+                front_x,
+                front_y,
+                width=trim_w_in * inch,
+                height=trim_h_in * inch,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+
+            c.save()
+            self.print_cover_pdf_path = out_path
+            if get_verbose():
+                success(f"Print cover PDF saved: {out_path} (pages={pages}, spine={spine_in:.3f}in)")
+            return out_path
+        except Exception as e:
+            if get_verbose():
+                warning(f"Print cover PDF generation failed: {e}")
             return ""
 
     # ------------------------------------------------------------------
@@ -567,11 +746,24 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         base = "https://api.gumroad.com/v2"
 
         # Step 1: Create product
+        # Use marketing-formatted description (not hype, but high-converting).
+        try:
+            from marketing import build_sales_page_description
+
+            description_for_listing = build_sales_page_description(
+                self.topic,
+                long_description=self.description,
+            )
+        except Exception:
+            description_for_listing = self.description[:2000]
+
         r = requests.post(f"{base}/products", data={
             "access_token": access_token,
             "name": self.title[:100],
             "price": int(get_ebook_price() * 100),  # cents
-            "description": self.description[:2000],
+            "description": description_for_listing[:2000],
+            # Publishing at create-time makes status more consistent across Gumroad UI changes.
+            "published": "true",
         }, timeout=20)
 
         if not r.ok:
@@ -580,9 +772,17 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
         product = r.json().get("product", {})
         product_id = product.get("id", "")
-        product_url = product.get("short_url", "")
+        product_url = (
+            product.get("short_url", "")
+            or product.get("url", "")
+            or f"https://app.gumroad.com/products/{product_id}"
+        )
         if get_verbose():
             info(f"Gumroad product created (draft): {product_url}")
+
+        if not product_id:
+            warning("Gumroad API create returned no product id — cannot continue.")
+            return ""
 
         # Step 2: Upload PDF file
         if self.pdf_path and os.path.exists(self.pdf_path):
@@ -600,16 +800,48 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 if get_verbose():
                     warning(f"Gumroad PDF upload failed: {_fe}")
 
+        # Upload EPUB too (helps readers and makes the product clearly deliverable)
+        if self.epub_path and os.path.exists(self.epub_path):
+            try:
+                with open(self.epub_path, "rb") as f:
+                    r_epub = requests.post(
+                        f"{base}/products/{product_id}/product_files",
+                        data={"access_token": access_token},
+                        files={"file": (os.path.basename(self.epub_path), f, "application/epub+zip")},
+                        timeout=60,
+                    )
+                if get_verbose():
+                    info(f"Gumroad EPUB upload: {r_epub.status_code}")
+            except Exception as _ee:
+                if get_verbose():
+                    warning(f"Gumroad EPUB upload failed: {_ee}")
+
         # Step 3: Publish
-        r3 = requests.put(f"{base}/products/{product_id}", data={
-            "access_token": access_token,
-            "published": "true",
-        }, timeout=15)
-        if r3.ok:
+        publish_payloads = [
+            {"access_token": access_token, "published": "true"},
+            {"access_token": access_token, "published": "1"},
+        ]
+        published_ok = False
+        last_resp = None
+        for payload in publish_payloads:
+            try:
+                last_resp = requests.put(
+                    f"{base}/products/{product_id}",
+                    data=payload,
+                    timeout=15,
+                )
+                if last_resp.ok:
+                    published_ok = True
+                    break
+            except Exception:
+                continue
+
+        if published_ok:
             success(f"Gumroad product published: {product_url}")
         else:
-            if get_verbose():
-                warning(f"Gumroad publish step: {r3.status_code} {r3.text[:200]}")
+            if get_verbose() and last_resp is not None:
+                warning(f"Gumroad publish step failed: {last_resp.status_code} {last_resp.text[:200]}")
+            warning("Gumroad may have kept the product Unpublished. Check your Gumroad dashboard for validation errors.")
 
         return product_url or f"https://app.gumroad.com/products/{product_id}"
 
@@ -925,13 +1157,29 @@ p  { margin-bottom: 0.8em; text-align: justify; }
     # Step 5b: Submit to Amazon KDP via Selenium
     # ------------------------------------------------------------------
 
-    def publish_to_kdp(self) -> None:
+    def publish_to_kdp(self) -> dict:
         """
         Automate Amazon KDP publishing via Selenium.
         Uses a pre-authenticated Firefox profile for kdp.amazon.com.
         Note: KDP takes 24-72h to review before going live.
         """
-        import undetected_chromedriver as uc
+        kdp_result = {"kindle": False, "paperback": False, "hardcover": False}
+
+        want_paperback = str(os.environ.get("KDP_PUBLISH_PAPERBACK", "true")).strip().lower() in ("1", "true", "yes")
+        want_hardcover = str(os.environ.get("KDP_PUBLISH_HARDCOVER", "true")).strip().lower() in ("1", "true", "yes")
+
+        uc = None
+        try:
+            import undetected_chromedriver as _uc  # type: ignore
+
+            uc = _uc
+        except Exception as _uce:
+            if get_verbose():
+                warning(f"KDP: undetected_chromedriver unavailable ({_uce}) — falling back to selenium.")
+
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
         from selenium.webdriver.common.by import By
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
@@ -942,10 +1190,10 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
         if not (kdp_email_cfg and kdp_pass_cfg):
             warning("KDP_EMAIL/KDP_PASSWORD not set — skipping KDP.")
-            return
+            return kdp_result
 
         if get_verbose():
-            info("Opening KDP in undetected Chrome...")
+            info("Opening KDP in Chrome...")
 
         def _chrome_major_version():
             try:
@@ -955,19 +1203,41 @@ p  { margin-bottom: 0.8em; text-align: justify; }
             except Exception:
                 return None
 
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
+        def _create_driver():
+            chrome_args = [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--window-size=1920,1080",
+            ]
+            if uc is not None:
+                options = uc.ChromeOptions()
+                for a in chrome_args:
+                    options.add_argument(a)
+                _chrome_ver = _chrome_major_version()
+                return uc.Chrome(
+                    options=options,
+                    headless=get_headless(),
+                    use_subprocess=False,
+                    **({"version_main": _chrome_ver} if _chrome_ver else {}),
+                )
 
-        _chrome_ver = _chrome_major_version()
-        driver = uc.Chrome(
-            options=options,
-            headless=get_headless(),
-            use_subprocess=False,
-            **( {"version_main": _chrome_ver} if _chrome_ver else {} ),
-        )
+            options = Options()
+            for a in chrome_args:
+                options.add_argument(a)
+            if get_headless():
+                options.add_argument("--headless=new")
+            return webdriver.Chrome(service=Service(), options=options)
+
+        driver = _create_driver()
+
+        def _xpath_literal(s: str) -> str:
+            if "'" not in s:
+                return f"'{s}'"
+            if '"' not in s:
+                return f'\"{s}\"'
+            parts = s.split("'")
+            return "concat(" + ", \"'\", ".join([f"'{p}'" for p in parts]) + ")"
 
         def _try_selectors(selectors, timeout=10):
             """Try multiple selectors, return first matching element or None."""
@@ -1502,16 +1772,44 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-step-1-details.png"))
                 except Exception:
                     pass
+            else:
+                if get_verbose():
+                    warning("KDP: Save and continue button not found on Details page.")
+                    try:
+                        driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-details-no-save.png"))
+                    except Exception:
+                        pass
+                return
+
+            if "content" not in driver.current_url:
+                if get_verbose():
+                    warning("KDP: could not reach Content page — stopping to avoid creating incomplete drafts.")
+                return
 
             # Content page — upload cover image then EPUB
             # KDP renders <input type="file"> as display:none (React UI).
 
             # Upload cover image first (KDP requires it)
             if self.cover_path and os.path.exists(self.cover_path):
+                # Select "Upload a cover" option if KDP shows multiple choices (Upload vs Cover Creator).
+                for by, sel in [
+                    (By.XPATH, "//input[@type='radio' and (contains(@id,'upload') or contains(@value,'upload'))]"),
+                    (By.XPATH, "//label[contains(translate(normalize-space(text()),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'upload') and contains(translate(normalize-space(text()),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]/preceding-sibling::input[@type='radio']"),
+                    (By.XPATH, "//label[contains(translate(normalize-space(text()),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'upload') and contains(translate(normalize-space(text()),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]/following-sibling::input[@type='radio']"),
+                ]:
+                    try:
+                        el = driver.find_element(by, sel)
+                        driver.execute_script("arguments[0].click();", el)
+                        time.sleep(0.5)
+                        break
+                    except Exception:
+                        continue
+
                 cover_btn_selectors = [
                     (By.XPATH, "//button[contains(text(),'Upload cover')]"),
                     (By.XPATH, "//button[contains(text(),'Upload your cover')]"),
                     (By.XPATH, "//span[contains(text(),'Upload cover')]"),
+                    (By.XPATH, "//button[contains(text(),'Upload eBook cover')]"),
                 ]
                 cover_btn = _try_selectors(cover_btn_selectors, timeout=6)
                 if cover_btn:
@@ -1521,13 +1819,23 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     except Exception:
                         pass
                 try:
-                    # KDP cover input is typically the first file input on the page
-                    all_inputs = WebDriverWait(driver, 10).until(
-                        lambda d: d.find_elements(By.XPATH, "//input[@type='file']")
-                    )
-                    if all_inputs:
-                        driver.execute_script("arguments[0].style.display = 'block';", all_inputs[0])
-                        all_inputs[0].send_keys(self.cover_path)
+                    # Prefer an image-only file input for cover.
+                    cover_input = None
+                    for by, sel in [
+                        (By.XPATH, "//input[@type='file' and contains(@accept,'image')]"),
+                        (By.XPATH, "//input[@type='file' and (contains(@id,'cover') or contains(@name,'cover'))]"),
+                        (By.XPATH, "//input[@type='file']"),
+                    ]:
+                        try:
+                            els = driver.find_elements(by, sel)
+                            if els:
+                                cover_input = els[0]
+                                break
+                        except Exception:
+                            continue
+                    if cover_input is not None:
+                        driver.execute_script("arguments[0].style.display = 'block';", cover_input)
+                        cover_input.send_keys(self.cover_path)
                         time.sleep(8)
                         if get_verbose():
                             info("KDP: cover image uploaded.")
@@ -1555,11 +1863,24 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
             # Step 2: locate hidden file input and force-show it
             try:
-                all_file_inputs = driver.find_elements(By.XPATH, "//input[@type='file']")
-                # Use last file input for manuscript (cover used first input)
-                upload_el = all_file_inputs[-1] if all_file_inputs else WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
-                )
+                # Prefer an input that looks like the manuscript uploader.
+                upload_el = None
+                for by, sel in [
+                    (By.XPATH, "//input[@type='file' and (contains(@accept,'epub') or contains(@accept,'.epub'))]"),
+                    (By.XPATH, "//input[@type='file' and (contains(@id,'manuscript') or contains(@name,'manuscript'))]"),
+                    (By.XPATH, "//input[@type='file']"),
+                ]:
+                    try:
+                        els = driver.find_elements(by, sel)
+                        if els:
+                            upload_el = els[-1]
+                            break
+                    except Exception:
+                        continue
+                if upload_el is None:
+                    upload_el = WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
+                    )
                 driver.execute_script("arguments[0].style.display = 'block';", upload_el)
                 upload_el.send_keys(self.epub_path)
                 if get_verbose():
@@ -1589,6 +1910,23 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                     driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-step-2-content.png"))
                 except Exception:
                     pass
+            else:
+                if get_verbose():
+                    warning("KDP: Save and continue button not found on Content page.")
+                    try:
+                        driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-content-no-save.png"))
+                    except Exception:
+                        pass
+                return
+
+            if "pricing" not in driver.current_url:
+                if get_verbose():
+                    warning("KDP: could not reach Pricing page — stopping before publish.")
+                    try:
+                        driver.save_screenshot(os.path.join(ROOT_DIR, ".mp", "kdp-content-stuck.png"))
+                    except Exception:
+                        pass
+                return
 
             # Pricing — set price (KDP uses per-territory inputs like price-value-US-)
             price_selectors = [
@@ -1664,9 +2002,219 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 time.sleep(3)
                 if get_verbose():
                     success("KDP submission sent (review takes 24-72h).")
+                kdp_result["kindle"] = True
             else:
                 if get_verbose():
                     warning("KDP publish button not found — finish manually at kdp.amazon.com.")
+
+            def _open_bookshelf():
+                driver.get("https://kdp.amazon.com/en_US/bookshelf")
+                time.sleep(10)
+
+            def _click_create_format_button(fmt: str) -> bool:
+                fmt_l = fmt.lower()
+                title_snip = (self.title or "").strip()[:50]
+                if not title_snip:
+                    return False
+                title_lit = _xpath_literal(title_snip)
+                btn_text = f"Create {fmt_l}"
+                xpaths = [
+                    f"//*[contains(normalize-space(), {title_lit})]/ancestor::*[.//button[contains(., '{btn_text}')]][1]//button[contains(., '{btn_text}')]",
+                    f"//*[contains(normalize-space(), {title_lit})]/ancestor::*[.//a[contains(., '{btn_text}')]][1]//a[contains(., '{btn_text}')]",
+                    f"//button[contains(., '{btn_text}')]",
+                ]
+                for xp in xpaths:
+                    try:
+                        el = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((By.XPATH, xp)))
+                        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+                        time.sleep(0.3)
+                        el.click()
+                        time.sleep(8)
+                        return True
+                    except Exception:
+                        continue
+                return False
+
+            def _upload_file_best_effort(path: str, *, accept_hint: str) -> bool:
+                if not path or not os.path.exists(path):
+                    return False
+                selectors = [
+                    (By.XPATH, f"//input[@type='file' and contains(@accept,'{accept_hint}')]"),
+                    (By.XPATH, "//input[@type='file']"),
+                ]
+                for by, sel in selectors:
+                    try:
+                        els = driver.find_elements(by, sel)
+                        if not els:
+                            continue
+                        el = els[-1]
+                        driver.execute_script("arguments[0].style.display = 'block';", el)
+                        el.send_keys(path)
+                        return True
+                    except Exception:
+                        continue
+                return False
+
+            def _submit_print_format(fmt: str) -> bool:
+                fmt_l = fmt.lower()
+                if not self.print_pdf_path or not os.path.exists(self.print_pdf_path):
+                    if get_verbose():
+                        warning(f"KDP {fmt_l}: print PDF missing; cannot upload manuscript.")
+                    return False
+                if not self.print_cover_pdf_path or not os.path.exists(self.print_cover_pdf_path):
+                    if get_verbose():
+                        warning(f"KDP {fmt_l}: print cover PDF missing; cannot upload cover.")
+                    return False
+
+                time.sleep(6)
+
+                # Details -> Content
+                save_selectors_local = [
+                    (By.XPATH, "//button[contains(@id,'save-and-continue')]"),
+                    (By.XPATH, "//button[contains(text(),'Save and continue')]"),
+                    (By.XPATH, "//button[contains(text(),'Save & Continue')]"),
+                    (By.XPATH, "//input[@type='submit' and contains(@value,'Save')]"),
+                ]
+                save_el_local = _try_selectors(save_selectors_local, timeout=12)
+                if not save_el_local:
+                    if get_verbose():
+                        warning(f"KDP {fmt_l}: save/continue not found on details.")
+                    return False
+                driver.execute_script("arguments[0].scrollIntoView(true);", save_el_local)
+                time.sleep(0.4)
+                driver.execute_script("arguments[0].click();", save_el_local)
+                time.sleep(10)
+
+                # Content: choose conservative defaults (best-effort)
+                # - Ink: black & white
+                # - Paper: cream (paperback) / white (hardcover often defaults)
+                # - Cover finish: matte
+                try:
+                    for xp in [
+                        "//label[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'black') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'white')]",
+                        "//span[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'black') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'white')]",
+                    ]:
+                        try:
+                            el = driver.find_element(By.XPATH, xp)
+                            driver.execute_script("arguments[0].click();", el)
+                            time.sleep(0.5)
+                            break
+                        except Exception:
+                            continue
+
+                    if fmt_l == "paperback":
+                        for xp in [
+                            "//label[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cream')]",
+                            "//span[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cream')]",
+                        ]:
+                            try:
+                                el = driver.find_element(By.XPATH, xp)
+                                driver.execute_script("arguments[0].click();", el)
+                                time.sleep(0.5)
+                                break
+                            except Exception:
+                                continue
+
+                    for xp in [
+                        "//label[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matte')]",
+                        "//span[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matte')]",
+                    ]:
+                        try:
+                            el = driver.find_element(By.XPATH, xp)
+                            driver.execute_script("arguments[0].click();", el)
+                            time.sleep(0.5)
+                            break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+                # Content: upload manuscript PDF
+                _upload_file_best_effort(self.print_pdf_path, accept_hint="pdf")
+                time.sleep(25)
+
+                # Cover: upload full-wrap cover PDF (best-effort)
+                try:
+                    # Select "Upload a cover you already have" if present
+                    for xp in [
+                        "//label[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'upload') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]",
+                        "//span[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'upload') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]",
+                    ]:
+                        try:
+                            el = driver.find_element(By.XPATH, xp)
+                            driver.execute_script("arguments[0].click();", el)
+                            time.sleep(1)
+                            break
+                        except Exception:
+                            continue
+
+                    launch = None
+                    for xp in [
+                        "//button[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'upload') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]",
+                        "//button[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'browse') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]",
+                        "//button[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'choose') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]",
+                    ]:
+                        try:
+                            launch = WebDriverWait(driver, 6).until(EC.element_to_be_clickable((By.XPATH, xp)))
+                            break
+                        except Exception:
+                            continue
+                    if launch:
+                        launch.click()
+                        time.sleep(2)
+                    _upload_file_best_effort(self.print_cover_pdf_path, accept_hint="pdf")
+                    time.sleep(25)
+                except Exception as _ce:
+                    if get_verbose():
+                        warning(f"KDP {fmt_l}: cover upload step failed ({_ce}).")
+
+                # Content -> Pricing
+                save_el2_local = _try_selectors(save_selectors_local, timeout=12)
+                if not save_el2_local:
+                    if get_verbose():
+                        warning(f"KDP {fmt_l}: save/continue not found on content.")
+                    return False
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", save_el2_local)
+                time.sleep(0.4)
+                driver.execute_script("arguments[0].click();", save_el2_local)
+                time.sleep(12)
+
+                # Pricing: set list price (if field exists)
+                price_selectors_local = [
+                    (By.XPATH, "//input[contains(@id,'price-value-')]"),
+                    (By.XPATH, "//input[contains(@id,'price-value')]"),
+                    (By.XPATH, "//input[contains(@id,'price') and @type='text']"),
+                ]
+                price_el_local = _try_selectors(price_selectors_local, timeout=8)
+                if price_el_local:
+                    _scroll_and_fill(price_el_local, str(get_ebook_price()))
+                    time.sleep(1)
+
+                pub_selectors_local = [
+                    (By.XPATH, f"//button[contains(.,'Publish') and contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'{fmt_l}')]"),
+                    (By.XPATH, "//button[contains(text(),'Publish')]"),
+                    (By.XPATH, "//input[@type='submit' and contains(@value,'Publish')]"),
+                ]
+                pub_el_local = _try_selectors(pub_selectors_local, timeout=12)
+                if not pub_el_local:
+                    if get_verbose():
+                        warning(f"KDP {fmt_l}: publish button not found.")
+                    return False
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", pub_el_local)
+                time.sleep(0.4)
+                pub_el_local.click()
+                time.sleep(6)
+                if get_verbose():
+                    success(f"KDP {fmt_l} submission sent (review takes 24-72h).")
+                return True
+
+            # Create paperback / hardcover from Bookshelf (best-effort)
+            _open_bookshelf()
+            if want_paperback and _click_create_format_button("paperback"):
+                kdp_result["paperback"] = _submit_print_format("paperback")
+                _open_bookshelf()
+            if want_hardcover and _click_create_format_button("hardcover"):
+                kdp_result["hardcover"] = _submit_print_format("hardcover")
 
         except Exception as e:
             if get_verbose():
@@ -1674,6 +2222,8 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         finally:
             time.sleep(2)
             driver.quit()
+
+        return kdp_result
 
     # ------------------------------------------------------------------
     # Main run method
@@ -1703,8 +2253,32 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         info("Formatting EPUB...")
         self.format_epub()
 
+        info("Formatting print PDF (paperback/hardcover)...")
+        trim_size = os.environ.get("KDP_PRINT_TRIM_SIZE", "6x9").strip() or "6x9"
+        try:
+            self.format_print_pdf(trim_size=trim_size)
+        except Exception as _pe:
+            warning(f"Print PDF generation failed: {_pe}")
+
         info("Generating cover image...")
-        self.cover_path = self.generate_cover_image()
+        self.cover_path = self.generate_cover_image(
+            out_path=os.path.join(ROOT_DIR, ".mp", f"ebook-cover-{self.slug}.png")
+        )
+
+        info("Generating print cover image...")
+        # 6x9 @ 300 DPI = 1800x2700; use higher for better quality.
+        self.print_cover_path = self.generate_cover_image(
+            width=2550,
+            height=3300,
+            out_path=os.path.join(ROOT_DIR, ".mp", f"ebook-print-cover-{self.slug}.png"),
+        )
+
+        info("Generating print cover PDF (wrap)...")
+        paper = os.environ.get("KDP_PRINT_PAPER", "cream").strip() or "cream"
+        try:
+            self.generate_print_cover_pdf(trim_size=trim_size, paper=paper)
+        except Exception as _ce:
+            warning(f"Print cover PDF generation failed: {_ce}")
 
         gumroad_url = ""
         _gumroad_ok = get_gumroad_access_token() or os.environ.get("GUMROAD_EMAIL", "").strip()
@@ -1713,19 +2287,47 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         else:
             warning("Skipping Gumroad (no access token or GUMROAD_EMAIL). Set gumroad_access_token in config.json.")
 
+        # Persist last eBook URL for cross-promotion in video/reel pipelines
+        if gumroad_url:
+            try:
+                mp_dir = os.path.join(ROOT_DIR, ".mp")
+                os.makedirs(mp_dir, exist_ok=True)
+                with open(os.path.join(mp_dir, "last_ebook_url.txt"), "w", encoding="utf-8") as f:
+                    f.write(gumroad_url)
+                with open(os.path.join(mp_dir, "last_ebook_title.txt"), "w", encoding="utf-8") as f:
+                    f.write(self.title)
+                with open(os.path.join(mp_dir, "last_ebook_topic.txt"), "w", encoding="utf-8") as f:
+                    f.write(self.topic)
+            except Exception:
+                pass
+
+        kdp_result = {}
         _kdp_ok = get_kdp_firefox_profile() or (get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip())
         if _kdp_ok:
-            self.publish_to_kdp()
+            kdp_result = self.publish_to_kdp()
         else:
             warning("Skipping KDP (no kdp_firefox_profile or KDP_EMAIL). Set kdp_firefox_profile in config.json.")
+
+        require_kdp = str(os.environ.get("REQUIRE_KDP_PUBLISH", "")).strip().lower() in ("1", "true", "yes")
+        if require_kdp:
+            if not kdp_result.get("kindle"):
+                raise RuntimeError("KDP Kindle submission did not complete (REQUIRE_KDP_PUBLISH=1).")
+            if str(os.environ.get("KDP_PUBLISH_PAPERBACK", "true")).strip().lower() in ("1", "true", "yes"):
+                if not kdp_result.get("paperback"):
+                    raise RuntimeError("KDP paperback submission did not complete (REQUIRE_KDP_PUBLISH=1).")
+            if str(os.environ.get("KDP_PUBLISH_HARDCOVER", "true")).strip().lower() in ("1", "true", "yes"):
+                if not kdp_result.get("hardcover"):
+                    raise RuntimeError("KDP hardcover submission did not complete (REQUIRE_KDP_PUBLISH=1).")
 
         result = {
             "id": str(uuid.uuid4()),
             "title": self.title,
             "topic": self.topic,
             "pdf_path": self.pdf_path,
+            "print_pdf_path": self.print_pdf_path,
             "epub_path": self.epub_path,
             "gumroad_url": gumroad_url,
+            "kdp": kdp_result,
             "price": get_ebook_price(),
             "published_at": datetime.utcnow().isoformat(),
         }

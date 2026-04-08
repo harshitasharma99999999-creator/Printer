@@ -102,3 +102,11 @@ jobs:
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python src/cron.py longform 944ff01c-c1ee-44f4-a59f-cb3f44b056c0 --niche "law of attraction"
+
+      - name: Upload generated video artifact (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: longform-output
+          path: .mp/*.mp4
+          if-no-files-found: ignore

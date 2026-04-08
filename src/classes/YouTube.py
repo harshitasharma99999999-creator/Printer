@@ -258,18 +258,37 @@ Subject: {self.subject}"""
             return self.generate_metadata()
 
         description = self.generate_response(
-            f"Please generate a YouTube Video Description for the following script: {self.script}. Only return the description, nothing else."
+            f"Please generate a YouTube Video Description for the following script: {self.script}. "
+            f"Tone: calm, confident, helpful. No hype. No markdown. "
+            f"Only return the description, nothing else."
         )
 
         affiliate_link = self._get_product_affiliate_link()
         if affiliate_link:
-            description += f"\n\n🛒 Get it here → {affiliate_link}"
+            description += f"\n\n🛒 Recommended → {affiliate_link}"
             # Write for Instagram runner to pick up in the same CI run
             try:
                 with open(os.path.join(ROOT_DIR, ".mp", "affiliate_link.txt"), "w") as _f:
                     _f.write(affiliate_link)
             except Exception:
                 pass
+
+        # Add non-salesy CTA for the matching eBook (if available)
+        try:
+            from marketing import build_youtube_description, get_latest_ebook_url
+
+            mp_dir = os.path.join(ROOT_DIR, ".mp")
+            ebook_url = get_latest_ebook_url(mp_dir)
+            description = build_youtube_description(
+                base_description=description,
+                topic=self.subject,
+                ebook_url=ebook_url,
+                affiliate_link=affiliate_link,
+                include_disclosure=True,
+                is_shorts=True,
+            )
+        except Exception:
+            pass
 
         # #Shorts tag is required for YouTube to classify vertical videos as Shorts
         if "#Shorts" not in description and "#shorts" not in description:
@@ -712,6 +731,26 @@ Subject: {self.subject}"""
 
         success(f'Wrote Video to "{combined_image_path}"')
 
+        # Stable path for downstream automations (Instagram, artifacts, etc.)
+        try:
+            stable_path = os.path.join(ROOT_DIR, ".mp", "last_short.mp4")
+            try:
+                if os.path.exists(stable_path):
+                    os.remove(stable_path)
+            except Exception:
+                pass
+            # Copy rather than rename so the random UUID file remains for debugging.
+            import shutil
+
+            shutil.copyfile(combined_image_path, stable_path)
+            with open(os.path.join(ROOT_DIR, ".mp", "last_short_path.txt"), "w", encoding="utf-8") as f:
+                f.write(os.path.abspath(stable_path))
+            if get_verbose():
+                info(f"Saved stable short path: {stable_path}")
+        except Exception as _se:
+            if get_verbose():
+                warning(f"Failed to write stable short marker file: {_se}")
+
         return combined_image_path
 
     def generate_video(self, tts_instance: TTS) -> str:
@@ -781,11 +820,13 @@ Subject: {self.subject}"""
             success (bool): Whether the upload was successful or not.
         """
         from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
         from googleapiclient.http import MediaFileUpload
+        from utils import format_youtube_http_error
 
         try:
             creds = self._get_yt_credentials()
-            youtube = build("youtube", "v3", credentials=creds)
+            youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
             verbose = get_verbose()
 
             body = {
@@ -821,6 +862,7 @@ Subject: {self.subject}"""
 
             self.add_video(
                 {
+                    "subject": self.subject,
                     "title": self.metadata["title"],
                     "description": self.metadata["description"],
                     "url": url,
@@ -829,6 +871,12 @@ Subject: {self.subject}"""
             )
             return True
 
+        except HttpError as e:
+            warning(format_youtube_http_error(e))
+            if get_verbose():
+                import traceback
+                traceback.print_exc()
+            return False
         except Exception as e:
             import traceback
             warning(f"Short upload error: {e}")
