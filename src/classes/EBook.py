@@ -2231,19 +2231,24 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
     def run(self) -> dict:
         """Run the full pipeline. Returns result dict for cache."""
-        info("Fetching trending topics...")
-        topics = self.get_trending_topics()
+        forced_topic = os.environ.get("EBOOK_TOPIC", "").strip()
+        if forced_topic:
+            self.topic = forced_topic
+            info(f"Using forced eBook topic (EBOOK_TOPIC): {self.topic}")
+        else:
+            info("Fetching trending topics...")
+            topics = self.get_trending_topics()
 
-        if not topics:
-            topics = ["productivity and time management", "mental wellness", "personal finance basics"]
-            warning("No trending topics fetched — using fallback topics.")
+            if not topics:
+                topics = ["productivity and time management", "mental wellness", "personal finance basics"]
+                warning("No trending topics fetched — using fallback topics.")
 
-        info(f"Found {len(topics)} topics. Asking LLM to pick the best one...")
-        for t in topics[:8]:
-            print(f"  - {t}")
+            info(f"Found {len(topics)} topics. Asking LLM to pick the best one...")
+            for t in topics[:8]:
+                print(f"  - {t}")
 
-        self.topic = self.select_topic(topics)
-        info(f"Selected topic: {self.topic}")
+            self.topic = self.select_topic(topics)
+            info(f"Selected topic: {self.topic}")
 
         self.generate_content()
 
