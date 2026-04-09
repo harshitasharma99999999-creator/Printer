@@ -1,4 +1,5 @@
 import os
+import os
 import re
 from datetime import datetime, timezone
 
@@ -108,7 +109,14 @@ def build_youtube_description(
     lines.append(soft_urgency(topic))
     lines.append("")
     if ebook_url:
-        lines.append(f"Full guide + checklist: {ebook_url}")
+        lines.append("Companion eBook (PDF + EPUB) — practical steps, not theory:")
+        lines.append(ebook_url)
+        lines.append("What you’ll get inside:")
+        lines.append("- A simple reality-shift routine (10 minutes/day)")
+        lines.append("- Shadow-work prompts to break repeating patterns")
+        lines.append("- A clear checklist you can follow today")
+        lines.append("- The “dark truth” reframes that stop self-sabotage")
+        lines.append("If this video hit you, this is the next step.")
     if affiliate_link:
         lines.append(f"Recommended: {affiliate_link}")
     if include_disclosure and (ebook_url or affiliate_link):

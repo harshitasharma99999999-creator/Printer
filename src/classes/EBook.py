@@ -16,6 +16,7 @@ from config import (
     get_kdp_email, get_kdp_password
 )
 from llm_provider import generate_text
+from gumroad import GumroadClient
 
 # reportlab
 from reportlab.lib.pagesizes import letter
@@ -108,11 +109,16 @@ class EBook:
 
             # Load fonts — fall back to default if not available
             font_paths = [
+                os.path.join(ROOT_DIR, "fonts", "bold_font.ttf"),
+                "C:\\Windows\\Fonts\\arialbd.ttf",
+                "C:\\Windows\\Fonts\\Arial Bold.ttf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
                 "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
             ]
             font_paths_regular = [
+                "C:\\Windows\\Fonts\\arial.ttf",
+                "C:\\Windows\\Fonts\\Arial.ttf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                 "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
                 "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
@@ -445,9 +451,23 @@ class EBook:
         if get_verbose():
             info(f"Generating eBook content for: {self.topic}")
 
+        context = os.environ.get("EBOOK_CONTEXT", "").strip()
+        context_block = ""
+        if context:
+            # Keep prompt size stable; just enough to anchor the book to the video.
+            ctx = context[:2000]
+            context_block = (
+                "\n\nContext (for alignment only; do NOT mention YouTube/video in the output):\n"
+                f"{ctx}\n"
+            )
+
+        def _p(s: str) -> str:
+            return f"{s}{context_block}" if context_block else s
+
         # Title — keyword-first formula proven to rank on Amazon
         title_raw = generate_text(
-            f'Write a compelling Amazon Kindle eBook title for the topic: "{self.topic}"\n'
+            _p(
+                f'Write a compelling Amazon Kindle eBook title for the topic: "{self.topic}"\n'
             f'Use one of these proven formats:\n'
             f'- "How to [Outcome]: [Number] [Methods] to [Benefit]"\n'
             f'- "[Topic] Mastery: The Complete Guide to [Outcome]"\n'
@@ -457,24 +477,29 @@ class EBook:
             f'- Promise a specific, measurable benefit\n'
             f'- Under 60 characters total\n'
             f'Return ONLY the title, nothing else.'
+            )
         ).strip().split("\n")[0]
         self.title = title_raw[:120]
 
         # Subtitle (for KDP — boosts discoverability)
         subtitle_raw = generate_text(
-            f'Write a short subtitle (max 12 words) for the eBook "{self.title}". '
-            f'Include 2-3 relevant keywords. Return only the subtitle text.'
+            _p(
+                f'Write a short subtitle (max 12 words) for the eBook "{self.title}". '
+                f'Include 2-3 relevant keywords. Return only the subtitle text.'
+            )
         ).strip().split("\n")[0]
         self.subtitle = subtitle_raw[:200]
 
         # SEO keywords for Amazon (7 keyword phrases — search-volume-aware)
         kw_raw = generate_text(
-            f'Generate exactly 7 Amazon Kindle keyword phrases for a book about: "{self.topic}"\n'
+            _p(
+                f'Generate exactly 7 Amazon Kindle keyword phrases for a book about: "{self.topic}"\n'
             f'Rules:\n'
             f'- Each phrase must be 2-5 words that people actually type into Amazon search\n'
             f'- Mix formats: "how to [topic]", "[topic] for beginners", "best [topic] tips", "[topic] guide"\n'
             f'- NO single words, NO brand names, NO overly broad terms\n'
             f'Return ONLY the 7 phrases, one per line, no numbers or bullets.'
+            )
         ).strip()
         self.keywords = [
             re.sub(r'^[\d\-\.\)\s]+', '', l).strip()
@@ -485,7 +510,8 @@ class EBook:
 
         # Description — HTML-formatted, keyword-rich (KDP supports <b> and <br>)
         self.description = generate_text(
-            f'Write an Amazon Kindle book description for: "{self.title}"\n'
+            _p(
+                f'Write an Amazon Kindle book description for: "{self.title}"\n'
             f'Topic: {self.topic}\n'
             f'Keywords to include: {", ".join(self.keywords[:5])}\n\n'
             f'Use this exact HTML format:\n'
@@ -508,13 +534,16 @@ class EBook:
             f'- 400-600 words total\n'
             f'- Include the keywords naturally in the body text\n'
             f'- No affiliate links, no external URLs, no first-person'
+            )
         ).strip()
 
         # Chapter outline
         outline_raw = generate_text(
-            f'For the eBook "{self.title}", write exactly 5 chapter titles. '
-            f'Each title should be practical and specific. '
-            f'Return them numbered 1-5, one per line, no extra text.'
+            _p(
+                f'For the eBook "{self.title}", write exactly 5 chapter titles. '
+                f'Each title should be practical and specific. '
+                f'Return them numbered 1-5, one per line, no extra text.'
+            )
         ).strip()
 
         chapter_titles = []
@@ -539,10 +568,12 @@ class EBook:
             if get_verbose():
                 info(f"  Writing chapter {i}/5: {ch_title}")
             body = generate_text(
-                f'Write Chapter {i} of the eBook "{self.title}". '
-                f'Chapter title: "{ch_title}". '
-                f'Write 600-800 words. Use clear paragraphs. Include practical tips and examples. '
-                f'Do not use markdown headers inside the text. Return only the chapter body text.'
+                _p(
+                    f'Write Chapter {i} of the eBook "{self.title}". '
+                    f'Chapter title: "{ch_title}". '
+                    f'Write 600-800 words. Use clear paragraphs. Include practical tips and examples. '
+                    f'Do not use markdown headers inside the text. Return only the chapter body text.'
+                )
             ).strip()
             self.chapters.append({"title": ch_title, "body": body})
 
@@ -743,7 +774,8 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
     def _publish_gumroad_api(self, access_token: str) -> str:
         """Publish to Gumroad using API v2 (no Selenium needed)."""
-        base = "https://api.gumroad.com/v2"
+        mp_dir = os.path.join(ROOT_DIR, ".mp")
+        client = GumroadClient(access_token, base_url="https://api.gumroad.com/v2", debug_dir=mp_dir)
 
         # Step 1: Create product
         # Use marketing-formatted description (not hype, but high-converting).
@@ -757,20 +789,11 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         except Exception:
             description_for_listing = self.description[:2000]
 
-        r = requests.post(f"{base}/products", data={
-            "access_token": access_token,
-            "name": self.title[:100],
-            "price": int(get_ebook_price() * 100),  # cents
-            "description": description_for_listing[:2000],
-            # Publishing at create-time makes status more consistent across Gumroad UI changes.
-            "published": "true",
-        }, timeout=20)
-
-        if not r.ok:
-            warning(f"Gumroad API create failed: {r.status_code} {r.text[:300]}")
-            return ""
-
-        product = r.json().get("product", {})
+        product = client.create_product(
+            name=self.title[:100],
+            price_cents=int(get_ebook_price() * 100),
+            description=description_for_listing[:2000],
+        )
         product_id = product.get("id", "")
         product_url = (
             product.get("short_url", "")
@@ -786,62 +809,28 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
         # Step 2: Upload PDF file
         if self.pdf_path and os.path.exists(self.pdf_path):
-            try:
-                with open(self.pdf_path, "rb") as f:
-                    r2 = requests.post(
-                        f"{base}/products/{product_id}/product_files",
-                        data={"access_token": access_token},
-                        files={"file": (os.path.basename(self.pdf_path), f, "application/pdf")},
-                        timeout=60,
-                    )
-                if get_verbose():
-                    info(f"Gumroad PDF upload: {r2.status_code}")
-            except Exception as _fe:
-                if get_verbose():
-                    warning(f"Gumroad PDF upload failed: {_fe}")
+            client.upload_product_file(
+                product_id=product_id,
+                file_path=self.pdf_path,
+                mime="application/pdf",
+            )
 
         # Upload EPUB too (helps readers and makes the product clearly deliverable)
         if self.epub_path and os.path.exists(self.epub_path):
-            try:
-                with open(self.epub_path, "rb") as f:
-                    r_epub = requests.post(
-                        f"{base}/products/{product_id}/product_files",
-                        data={"access_token": access_token},
-                        files={"file": (os.path.basename(self.epub_path), f, "application/epub+zip")},
-                        timeout=60,
-                    )
-                if get_verbose():
-                    info(f"Gumroad EPUB upload: {r_epub.status_code}")
-            except Exception as _ee:
-                if get_verbose():
-                    warning(f"Gumroad EPUB upload failed: {_ee}")
+            client.upload_product_file(
+                product_id=product_id,
+                file_path=self.epub_path,
+                mime="application/epub+zip",
+            )
 
-        # Step 3: Publish
-        publish_payloads = [
-            {"access_token": access_token, "published": "true"},
-            {"access_token": access_token, "published": "1"},
-        ]
-        published_ok = False
-        last_resp = None
-        for payload in publish_payloads:
-            try:
-                last_resp = requests.put(
-                    f"{base}/products/{product_id}",
-                    data=payload,
-                    timeout=15,
-                )
-                if last_resp.ok:
-                    published_ok = True
-                    break
-            except Exception:
-                continue
+        # Step 3: Publish/enable (more reliable than legacy "published=true")
+        published_ok = client.enable_product(product_id=product_id)
 
         if published_ok:
             success(f"Gumroad product published: {product_url}")
         else:
-            if get_verbose() and last_resp is not None:
-                warning(f"Gumroad publish step failed: {last_resp.status_code} {last_resp.text[:200]}")
             warning("Gumroad may have kept the product Unpublished. Check your Gumroad dashboard for validation errors.")
+            return ""
 
         return product_url or f"https://app.gumroad.com/products/{product_id}"
 
@@ -2231,6 +2220,11 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
     def run(self) -> dict:
         """Run the full pipeline. Returns result dict for cache."""
+        skip_print = str(os.environ.get("EBOOK_SKIP_PRINT", "")).strip().lower() in ("1", "true", "yes")
+        skip_kdp = str(os.environ.get("EBOOK_SKIP_KDP", "")).strip().lower() in ("1", "true", "yes")
+        skip_epub = str(os.environ.get("EBOOK_SKIP_EPUB", "")).strip().lower() in ("1", "true", "yes")
+        skip_gumroad = str(os.environ.get("EBOOK_SKIP_GUMROAD", "")).strip().lower() in ("1", "true", "yes")
+
         forced_topic = os.environ.get("EBOOK_TOPIC", "").strip()
         if forced_topic:
             self.topic = forced_topic
@@ -2255,42 +2249,53 @@ p  { margin-bottom: 0.8em; text-align: justify; }
         info("Formatting PDF...")
         self.format_pdf()
 
-        info("Formatting EPUB...")
-        self.format_epub()
+        if not skip_epub:
+            info("Formatting EPUB...")
+            self.format_epub()
+        else:
+            self.epub_path = ""
 
-        info("Formatting print PDF (paperback/hardcover)...")
         trim_size = os.environ.get("KDP_PRINT_TRIM_SIZE", "6x9").strip() or "6x9"
-        try:
-            self.format_print_pdf(trim_size=trim_size)
-        except Exception as _pe:
-            warning(f"Print PDF generation failed: {_pe}")
+        if not skip_print:
+            info("Formatting print PDF (paperback/hardcover)...")
+            try:
+                self.format_print_pdf(trim_size=trim_size)
+            except Exception as _pe:
+                warning(f"Print PDF generation failed: {_pe}")
+        else:
+            self.print_pdf_path = ""
 
         info("Generating cover image...")
         self.cover_path = self.generate_cover_image(
             out_path=os.path.join(ROOT_DIR, ".mp", f"ebook-cover-{self.slug}.png")
         )
 
-        info("Generating print cover image...")
-        # 6x9 @ 300 DPI = 1800x2700; use higher for better quality.
-        self.print_cover_path = self.generate_cover_image(
-            width=2550,
-            height=3300,
-            out_path=os.path.join(ROOT_DIR, ".mp", f"ebook-print-cover-{self.slug}.png"),
-        )
+        if not skip_print:
+            info("Generating print cover image...")
+            # 6x9 @ 300 DPI = 1800x2700; use higher for better quality.
+            self.print_cover_path = self.generate_cover_image(
+                width=2550,
+                height=3300,
+                out_path=os.path.join(ROOT_DIR, ".mp", f"ebook-print-cover-{self.slug}.png"),
+            )
 
-        info("Generating print cover PDF (wrap)...")
-        paper = os.environ.get("KDP_PRINT_PAPER", "cream").strip() or "cream"
-        try:
-            self.generate_print_cover_pdf(trim_size=trim_size, paper=paper)
-        except Exception as _ce:
-            warning(f"Print cover PDF generation failed: {_ce}")
+            info("Generating print cover PDF (wrap)...")
+            paper = os.environ.get("KDP_PRINT_PAPER", "cream").strip() or "cream"
+            try:
+                self.generate_print_cover_pdf(trim_size=trim_size, paper=paper)
+            except Exception as _ce:
+                warning(f"Print cover PDF generation failed: {_ce}")
+        else:
+            self.print_cover_path = ""
+            self.print_cover_pdf_path = ""
 
         gumroad_url = ""
-        _gumroad_ok = get_gumroad_access_token() or os.environ.get("GUMROAD_EMAIL", "").strip()
-        if _gumroad_ok:
-            gumroad_url = self.publish_to_gumroad()
-        else:
-            warning("Skipping Gumroad (no access token or GUMROAD_EMAIL). Set gumroad_access_token in config.json.")
+        if not skip_gumroad:
+            _gumroad_ok = get_gumroad_access_token() or os.environ.get("GUMROAD_EMAIL", "").strip()
+            if _gumroad_ok:
+                gumroad_url = self.publish_to_gumroad()
+            else:
+                warning("Skipping Gumroad (no access token or GUMROAD_EMAIL). Set gumroad_access_token in config.json.")
 
         # Persist last eBook URL for cross-promotion in video/reel pipelines
         if gumroad_url:
@@ -2307,11 +2312,12 @@ p  { margin-bottom: 0.8em; text-align: justify; }
                 pass
 
         kdp_result = {}
-        _kdp_ok = get_kdp_firefox_profile() or (get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip())
-        if _kdp_ok:
-            kdp_result = self.publish_to_kdp()
-        else:
-            warning("Skipping KDP (no kdp_firefox_profile or KDP_EMAIL). Set kdp_firefox_profile in config.json.")
+        if not skip_kdp:
+            _kdp_ok = get_kdp_firefox_profile() or (get_kdp_email() or os.environ.get("KDP_EMAIL", "").strip())
+            if _kdp_ok:
+                kdp_result = self.publish_to_kdp()
+            else:
+                warning("Skipping KDP (no kdp_firefox_profile or KDP_EMAIL). Set kdp_firefox_profile in config.json.")
 
         require_kdp = str(os.environ.get("REQUIRE_KDP_PUBLISH", "")).strip().lower() in ("1", "true", "yes")
         if require_kdp:

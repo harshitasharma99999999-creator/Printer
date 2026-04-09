@@ -1,16 +1,6 @@
-name: Universe Manifestation (All-in-One)
+name: Universe Manifestation (Manual All-in-One)
 
 on:
-  schedule:
-    # Shorts + Instagram (primary growth loop)
-    - cron: "0 */4 * * *"
-    # Affiliate Marketing Shorts
-    - cron: "0 5 * * *"
-    - cron: "0 17 * * *"
-    # Daily eBook + KDP print + long-form
-    - cron: "30 1 * * *"
-    # Spiritual Image Posts (Universe) — every 6 hours (offset from Shorts)
-    - cron: "0 2,8,14,20 * * *"
   workflow_dispatch:
     inputs:
       run_shorts:
@@ -34,15 +24,13 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 concurrency:
-  group: universe-manifestation
+  group: universe-manifestation-manual
   cancel-in-progress: true
 
 jobs:
   shorts:
     name: Shorts + Instagram
-    if: >
-      github.event_name == 'workflow_dispatch' && inputs.run_shorts == 'true' ||
-      github.event_name == 'schedule' && github.event.schedule == '0 */4 * * *'
+    if: inputs.run_shorts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -117,8 +105,10 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Keep topic aligned to the channel theme
+          GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           CONTENT_TOPIC: "manifestation law of attraction"
+          YOUTUBE_AUTO_EBOOK: "true"
+          YOUTUBE_REQUIRE_EBOOK: "true"
         run: python src/cron.py youtube 944ff01c-c1ee-44f4-a59f-cb3f44b056c0
 
       - name: Upload to Instagram Reels
@@ -136,15 +126,16 @@ jobs:
           name: universe-shorts-debug
           path: |
             .mp/*.png
+            .mp/*.json
             .mp/*.mp4
+            .mp/*.pdf
+            .mp/*.epub
             .mp/*.txt
           if-no-files-found: ignore
 
   afm:
     name: Affiliate Shorts + Instagram
-    if: >
-      github.event_name == 'workflow_dispatch' && inputs.run_afm == 'true' ||
-      github.event_name == 'schedule' && (github.event.schedule == '0 5 * * *' || github.event.schedule == '0 17 * * *')
+    if: inputs.run_afm == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -224,7 +215,10 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           AFFILIATE_LINK: "https://www.amazon.in/s?k=manifestation+crystals+healing&tag=harshita000-21"
+          YOUTUBE_AUTO_EBOOK: "true"
+          YOUTUBE_REQUIRE_EBOOK: "true"
         run: python src/cron.py afm afm-manifestation
 
       - name: Upload to Instagram Reels
@@ -242,15 +236,16 @@ jobs:
           name: universe-afm-debug
           path: |
             .mp/*.png
+            .mp/*.json
             .mp/*.mp4
+            .mp/*.pdf
+            .mp/*.epub
             .mp/*.txt
           if-no-files-found: ignore
 
   ebook_longform:
     name: eBook + KDP + Long-form
-    if: >
-      github.event_name == 'workflow_dispatch' && inputs.run_ebook_longform == 'true' ||
-      github.event_name == 'schedule' && github.event.schedule == '30 1 * * *'
+    if: inputs.run_ebook_longform == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 140
     steps:
@@ -339,7 +334,6 @@ jobs:
           REQUIRE_KDP_PUBLISH: "true"
           KDP_PRINT_TRIM_SIZE: "6x9"
           KDP_PRINT_PAPER: "cream"
-          # Force topic so the content stays aligned with Universe Manifestation
           EBOOK_TOPIC: "manifestation and law of attraction"
         run: python src/cron.py ebook dummy-id groq
 
@@ -373,9 +367,7 @@ jobs:
 
   image_posts:
     name: Spiritual Image Posts
-    if: >
-      github.event_name == 'workflow_dispatch' && inputs.run_image_posts == 'true' ||
-      github.event_name == 'schedule' && github.event.schedule == '0 2,8,14,20 * * *'
+    if: inputs.run_image_posts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

@@ -8,6 +8,7 @@ from uuid import uuid4
 from llm_provider import generate_text
 from config import ROOT_DIR, get_groq_api_key, get_verbose, get_nanobanana2_api_key
 from status import info, warning, success, error
+from gumroad import GumroadClient
 
 NICHES = [
     "phone accessories",
@@ -281,7 +282,7 @@ class Dropshipping:
                 warning("Dropshipping: GUMROAD_ACCESS_TOKEN not set, skipping Gumroad.")
             return ""
 
-        base = "https://api.gumroad.com/v2"
+        client = GumroadClient(access_token, base_url="https://api.gumroad.com/v2", debug_dir=os.path.join(ROOT_DIR, ".mp"))
         title = product.get("title", "")[:100]
         bullets = "\n".join(f"• {b}" for b in product.get("bullets", []))
         description = (
@@ -331,32 +332,21 @@ class Dropshipping:
                 ]
                 doc.build(story)
 
-                with open(out_path, "rb") as f:
-                    requests.post(
-                        f"{base}/products/{product_id}/product_files",
-                        data={"access_token": access_token},
-                        files={"file": (os.path.basename(out_path), f, "application/pdf")},
-                        timeout=60,
-                    )
+                client.upload_product_file(product_id=product_id, file_path=out_path, mime="application/pdf")
             except Exception as _e:
                 if get_verbose():
                     warning(f"Dropshipping: Gumroad info PDF upload failed ({_e}).")
 
         try:
-            r = requests.post(f"{base}/products", data={
-                "access_token": access_token,
-                "name": title,
-                "price": price_cents,
-                "description": description[:2000],
-                "published": "true",
-            }, timeout=20)
-
-            if not r.ok:
+            product_data = client.create_product(
+                name=title,
+                price_cents=price_cents,
+                description=description[:2000],
+            )
+            if not product_data:
                 if get_verbose():
-                    warning(f"Dropshipping: Gumroad create failed: {r.status_code} {r.text[:200]}")
+                    warning("Dropshipping: Gumroad create failed.")
                 return ""
-
-            product_data = r.json().get("product", {})
             product_id = product_data.get("id", "")
             product_url = product_data.get("short_url", f"https://app.gumroad.com/products/{product_id}")
 
@@ -367,27 +357,7 @@ class Dropshipping:
 
             _upload_info_pdf(product_id)
 
-            # Publish immediately (and verify)
-            pub_payloads = [
-                {"access_token": access_token, "published": "true"},
-                {"access_token": access_token, "published": "1"},
-            ]
-            pub_ok = False
-            pub_resp = None
-            for payload in pub_payloads:
-                try:
-                    pub_resp = requests.put(
-                        f"{base}/products/{product_id}",
-                        data=payload,
-                        timeout=15,
-                    )
-                    if pub_resp.ok:
-                        pub_ok = True
-                        break
-                except Exception:
-                    continue
-            if not pub_ok and get_verbose() and pub_resp is not None:
-                warning(f"Dropshipping: Gumroad publish failed: {pub_resp.status_code} {pub_resp.text[:200]}")
+            pub_ok = client.enable_product(product_id=product_id)
 
             if get_verbose():
                 if pub_ok:

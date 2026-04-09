@@ -767,8 +767,69 @@ Subject: {self.subject}"""
         if not hasattr(self, 'subject') or not self.subject:
             self.generate_topic()
 
+        # Fail fast if YouTube token is invalid/missing upload scope, so we don't waste time rendering.
+        try:
+            from utils import preflight_youtube_api
+
+            creds = self._get_yt_credentials()
+            preflight_youtube_api(creds, verbose=get_verbose())
+        except Exception as e:
+            # Keep error concise for GitHub Actions logs.
+            raise RuntimeError(str(e)) from e
+
         # Generate the Script
         self.generate_script()
+
+        # Optional: auto-generate + publish a companion eBook (Gumroad) for this video.
+        # This runs BEFORE metadata so the Gumroad link can be injected into the description.
+        auto_ebook = str(os.environ.get("YOUTUBE_AUTO_EBOOK", "")).strip().lower() in ("1", "true", "yes")
+        if auto_ebook:
+            require_ebook = str(os.environ.get("YOUTUBE_REQUIRE_EBOOK", "true")).strip().lower() in ("1", "true", "yes")
+            from config import get_gumroad_access_token
+            from classes.EBook import EBook
+
+            gumroad_ok = bool(
+                (os.environ.get("GUMROAD_ACCESS_TOKEN", "").strip())
+                or (os.environ.get("GUMROAD_SESSION_JSON", "").strip())
+                or (
+                    os.environ.get("GUMROAD_EMAIL", "").strip()
+                    and os.environ.get("GUMROAD_PASSWORD", "").strip()
+                )
+                or (get_gumroad_access_token() or "").strip()
+            )
+            if not gumroad_ok:
+                msg = (
+                    "YOUTUBE_AUTO_EBOOK is enabled but no Gumroad credentials were found. "
+                    "Set `GUMROAD_ACCESS_TOKEN` (recommended) or `GUMROAD_SESSION_JSON` "
+                    "or `GUMROAD_EMAIL`+`GUMROAD_PASSWORD`."
+                )
+                if require_ebook:
+                    raise RuntimeError(msg)
+                warning(msg)
+                auto_ebook = False
+
+        if auto_ebook:
+            keys = ["EBOOK_TOPIC", "EBOOK_CONTEXT", "EBOOK_SKIP_KDP", "EBOOK_SKIP_PRINT"]
+            prev = {k: os.environ.get(k) for k in keys}
+            try:
+                os.environ["EBOOK_TOPIC"] = self.subject
+                os.environ["EBOOK_CONTEXT"] = (self.script or "")[:5000]
+                os.environ.setdefault("EBOOK_SKIP_KDP", "1")
+                os.environ.setdefault("EBOOK_SKIP_PRINT", "1")
+
+                eb = EBook()
+                result = eb.run()
+                if not result.get("gumroad_url"):
+                    msg = "Companion eBook publish failed (no Gumroad URL). Check `.mp/gumroad_*` debug files and your Gumroad token/settings."
+                    if require_ebook:
+                        raise RuntimeError(msg)
+                    warning(msg)
+            finally:
+                for k, v in prev.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
 
         # Generate the Metadata
         self.generate_metadata()
@@ -799,15 +860,35 @@ Subject: {self.subject}"""
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
 
-        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        required_scopes = ["https://www.googleapis.com/auth/youtube.upload"]
         token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
+
+        token_info = None
         if token_json:
-            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            token_info = json.loads(token_json)
+            # Avoid overriding stored scopes; let preflight validate what this token actually grants.
+            creds = Credentials.from_authorized_user_info(token_info)
         else:
             token_path = os.path.join(ROOT_DIR, "token.json")
             if not os.path.exists(token_path):
-                raise FileNotFoundError("token.json not found. Run scripts/setup_youtube_auth.py first.")
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+                raise FileNotFoundError(
+                    "token.json not found. Run scripts/setup_youtube_auth.py first."
+                )
+            with open(token_path, "r", encoding="utf-8") as f:
+                token_info = json.loads(f.read())
+            creds = Credentials.from_authorized_user_file(token_path)
+
+        # Some token formats store scopes as "scope" (space-delimited) or "scopes" (list).
+        if not getattr(creds, "scopes", None) and isinstance(token_info, dict):
+            raw_scopes = token_info.get("scopes") or token_info.get("scope")
+            if isinstance(raw_scopes, str):
+                creds.scopes = [s for s in raw_scopes.split() if s]
+            elif isinstance(raw_scopes, list):
+                creds.scopes = [str(s) for s in raw_scopes if str(s).strip()]
+
+        # If scopes are missing from the token file entirely, still set the required scope for refresh flows.
+        if not getattr(creds, "scopes", None):
+            creds.scopes = required_scopes
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
         return creds

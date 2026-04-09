@@ -597,18 +597,32 @@ class LongForm:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
 
-        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        required_scopes = ["https://www.googleapis.com/auth/youtube.upload"]
 
         token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
+        token_info = None
         if token_json:
-            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            token_info = json.loads(token_json)
+            creds = Credentials.from_authorized_user_info(token_info)
         else:
             token_path = os.path.join(ROOT_DIR, "token.json")
             if not os.path.exists(token_path):
                 raise FileNotFoundError(
                     "token.json not found. Run: python scripts/setup_youtube_auth.py"
                 )
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+            with open(token_path, "r", encoding="utf-8") as f:
+                token_info = json.loads(f.read())
+            creds = Credentials.from_authorized_user_file(token_path)
+
+        if not getattr(creds, "scopes", None) and isinstance(token_info, dict):
+            raw_scopes = token_info.get("scopes") or token_info.get("scope")
+            if isinstance(raw_scopes, str):
+                creds.scopes = [s for s in raw_scopes.split() if s]
+            elif isinstance(raw_scopes, list):
+                creds.scopes = [str(s) for s in raw_scopes if str(s).strip()]
+
+        if not getattr(creds, "scopes", None):
+            creds.scopes = required_scopes
 
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())

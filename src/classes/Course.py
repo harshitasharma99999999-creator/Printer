@@ -5,6 +5,7 @@ import requests
 from llm_provider import generate_text
 from config import ROOT_DIR, get_verbose, get_gumroad_access_token
 from status import info, warning, success
+from gumroad import GumroadClient
 
 
 class Course:
@@ -126,35 +127,21 @@ class Course:
             f"Instant PDF download — read on any device."
         )
 
-        base = "https://api.gumroad.com/v2"
-        r = requests.post(f"{base}/products", data={
-            "access_token": access_token,
-            "name": title[:100],
-            "price": 1997,  # $19.97
-            "description": description,
-        }, timeout=20)
-
-        if not r.ok:
+        client = GumroadClient(access_token, base_url="https://api.gumroad.com/v2", debug_dir=os.path.join(ROOT_DIR, ".mp"))
+        product = client.create_product(name=title[:100], price_cents=1997, description=description)
+        if not product:
             if get_verbose():
-                warning(f"Course: Gumroad create failed {r.status_code}")
+                warning("Course: Gumroad create failed.")
             return ""
 
-        product = r.json().get("product", {})
         product_id = product.get("id", "")
         product_url = product.get("short_url", f"https://app.gumroad.com/products/{product_id}")
 
         if os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as f:
-                requests.post(
-                    f"{base}/products/{product_id}/product_files",
-                    data={"access_token": access_token},
-                    files={"file": (os.path.basename(pdf_path), f, "application/pdf")},
-                    timeout=120,
-                )
+            client.upload_product_file(product_id=product_id, file_path=pdf_path, mime="application/pdf")
 
-        requests.put(f"{base}/products/{product_id}", data={
-            "access_token": access_token, "published": "true",
-        }, timeout=15)
+        if not client.enable_product(product_id=product_id):
+            return ""
 
         if get_verbose():
             success(f"Course: Gumroad live → {product_url}")

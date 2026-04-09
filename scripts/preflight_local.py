@@ -152,17 +152,27 @@ def main() -> int:
         from googleapiclient.discovery import build
         from googleapiclient.errors import HttpError
 
-        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        REQUIRED_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
         token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
         token_path = os.path.join(ROOT_DIR, "token.json")
 
         creds = None
         if token_json:
-            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            creds = Credentials.from_authorized_user_info(json.loads(token_json))
         elif os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+            creds = Credentials.from_authorized_user_file(token_path)
 
         if creds is not None:
+            if callable(getattr(creds, "has_scopes", None)) and not creds.has_scopes(REQUIRED_SCOPES):
+                have = getattr(creds, "scopes", None)
+                have_str = ", ".join(have) if have else "unknown (not stored in token)"
+                fail(
+                    "YouTube token is missing the `youtube.upload` scope.\n"
+                    f"Current token scopes: {have_str}\n"
+                    "Re-run: python scripts/setup_youtube_auth.py (and update YOUTUBE_TOKEN_JSON)."
+                )
+                failures += 1
+                creds = None
             if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
 
