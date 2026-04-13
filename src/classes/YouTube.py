@@ -16,8 +16,8 @@ from uuid import uuid4
 from constants import *
 from typing import List
 from moviepy.editor import *
+from moviepy.video.fx.crop import crop as mpy_crop
 from termcolor import colored
-from moviepy.video.fx.all import crop
 from moviepy.video.tools.subtitles import SubtitlesClip
 from datetime import datetime
 
@@ -238,7 +238,7 @@ Subject: {self.subject}"""
 
     def generate_metadata(self) -> dict:
         """
-        Generates Video metadata for the to-be-uploaded YouTube Short (Title, Description).
+        Generates Video metadata for the to-be-uploaded YouTube Short (Title, Description, Tags).
 
         Returns:
             metadata (dict): The generated metadata.
@@ -263,6 +263,17 @@ Subject: {self.subject}"""
             f"Only return the description, nothing else."
         )
 
+        # Generate relevant tags based on the subject
+        tags_response = self.generate_response(
+            f"Generate 10-15 relevant YouTube tags for a video about: {self.subject}. "
+            f"Return ONLY a comma-separated list of tags, nothing else. "
+            f"Tags should be short (1-3 words), relevant to the topic, and optimized for search."
+        )
+        
+        # Parse tags from response
+        tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+        tags = tags[:15]  # YouTube allows max 15 tags
+        
         affiliate_link = self._get_product_affiliate_link()
         if affiliate_link:
             description += f"\n\n🛒 Recommended → {affiliate_link}"
@@ -294,7 +305,7 @@ Subject: {self.subject}"""
         if "#Shorts" not in description and "#shorts" not in description:
             description += "\n\n#Shorts #Short"
 
-        self.metadata = {"title": title, "description": description}
+        self.metadata = {"title": title, "description": description, "tags": tags}
 
         return self.metadata
 
@@ -465,7 +476,8 @@ Subject: {self.subject}"""
 
     def generate_image(self, prompt: str) -> str:
         """
-        Generates an AI Image based on the given prompt using Picsum (free, no API key).
+        Generates an AI Image based on the given prompt.
+        Tries Nano Banana 2 (Gemini) API first, falls back to Picsum if not configured.
 
         Args:
             prompt (str): Reference for image generation
@@ -473,6 +485,16 @@ Subject: {self.subject}"""
         Returns:
             path (str): The path to the generated image.
         """
+        # Try AI generation first if API key is configured
+        api_key = get_nanobanana2_api_key()
+        if api_key:
+            result = self.generate_image_nanobanana2(prompt)
+            if result:
+                return result
+            if get_verbose():
+                warning("AI image generation failed, falling back to Picsum")
+        
+        # Fallback to Picsum
         return self.generate_image_free(prompt)
 
     def generate_script_to_speech(self, tts_instance: TTS) -> str:
@@ -676,7 +698,7 @@ Subject: {self.subject}"""
                 if round((clip.w / clip.h), 4) < 0.5625:
                     if get_verbose():
                         info(f" => Resizing Image: {image_path} to 1080x1920")
-                    clip = crop(
+                    clip = mpy_crop(
                         clip,
                         width=clip.w,
                         height=round(clip.w / 0.5625),
@@ -686,7 +708,7 @@ Subject: {self.subject}"""
                 else:
                     if get_verbose():
                         info(f" => Resizing Image: {image_path} to 1920x1080")
-                    clip = crop(
+                    clip = mpy_crop(
                         clip,
                         width=round(0.5625 * clip.h),
                         height=clip.h,
@@ -763,96 +785,104 @@ Subject: {self.subject}"""
         Returns:
             path (str): The path to the generated MP4 File.
         """
-        # Generate the Topic (skip if subject already set via set_subject())
-        if not hasattr(self, 'subject') or not self.subject:
-            self.generate_topic()
-
-        # Fail fast if YouTube token is invalid/missing upload scope, so we don't waste time rendering.
         try:
-            from utils import preflight_youtube_api
+            # Generate the Topic (skip if subject already set via set_subject())
+            if not hasattr(self, 'subject') or not self.subject:
+                self.generate_topic()
 
-            creds = self._get_yt_credentials()
-            preflight_youtube_api(creds, verbose=get_verbose())
-        except Exception as e:
-            # Keep error concise for GitHub Actions logs.
-            raise RuntimeError(str(e)) from e
-
-        # Generate the Script
-        self.generate_script()
-
-        # Optional: auto-generate + publish a companion eBook (Gumroad) for this video.
-        # This runs BEFORE metadata so the Gumroad link can be injected into the description.
-        auto_ebook = str(os.environ.get("YOUTUBE_AUTO_EBOOK", "")).strip().lower() in ("1", "true", "yes")
-        if auto_ebook:
-            require_ebook = str(os.environ.get("YOUTUBE_REQUIRE_EBOOK", "true")).strip().lower() in ("1", "true", "yes")
-            from config import get_gumroad_access_token
-            from classes.EBook import EBook
-
-            gumroad_ok = bool(
-                (os.environ.get("GUMROAD_ACCESS_TOKEN", "").strip())
-                or (os.environ.get("GUMROAD_SESSION_JSON", "").strip())
-                or (
-                    os.environ.get("GUMROAD_EMAIL", "").strip()
-                    and os.environ.get("GUMROAD_PASSWORD", "").strip()
-                )
-                or (get_gumroad_access_token() or "").strip()
-            )
-            if not gumroad_ok:
-                msg = (
-                    "YOUTUBE_AUTO_EBOOK is enabled but no Gumroad credentials were found. "
-                    "Set `GUMROAD_ACCESS_TOKEN` (recommended) or `GUMROAD_SESSION_JSON` "
-                    "or `GUMROAD_EMAIL`+`GUMROAD_PASSWORD`."
-                )
-                if require_ebook:
-                    raise RuntimeError(msg)
-                warning(msg)
-                auto_ebook = False
-
-        if auto_ebook:
-            keys = ["EBOOK_TOPIC", "EBOOK_CONTEXT", "EBOOK_SKIP_KDP", "EBOOK_SKIP_PRINT"]
-            prev = {k: os.environ.get(k) for k in keys}
+            # Fail fast if YouTube token is invalid/missing upload scope, so we don't waste time rendering.
             try:
-                os.environ["EBOOK_TOPIC"] = self.subject
-                os.environ["EBOOK_CONTEXT"] = (self.script or "")[:5000]
-                os.environ.setdefault("EBOOK_SKIP_KDP", "1")
-                os.environ.setdefault("EBOOK_SKIP_PRINT", "1")
+                from utils import preflight_youtube_api
 
-                eb = EBook()
-                result = eb.run()
-                if not result.get("gumroad_url"):
-                    msg = "Companion eBook publish failed (no Gumroad URL). Check `.mp/gumroad_*` debug files and your Gumroad token/settings."
+                creds = self._get_yt_credentials()
+                preflight_youtube_api(creds, verbose=get_verbose())
+            except Exception as e:
+                # Keep error concise for GitHub Actions logs.
+                raise RuntimeError(str(e)) from e
+
+            # Generate the Script
+            self.generate_script()
+
+            # Optional: auto-generate + publish a companion eBook (Gumroad) for this video.
+            # This runs BEFORE metadata so the Gumroad link can be injected into the description.
+            auto_ebook = str(os.environ.get("YOUTUBE_AUTO_EBOOK", "")).strip().lower() in ("1", "true", "yes")
+            if auto_ebook:
+                require_ebook = str(os.environ.get("YOUTUBE_REQUIRE_EBOOK", "true")).strip().lower() in ("1", "true", "yes")
+                from config import get_gumroad_access_token
+                from classes.EBook import EBook
+
+                gumroad_ok = bool(
+                    (os.environ.get("GUMROAD_ACCESS_TOKEN", "").strip())
+                    or (os.environ.get("GUMROAD_SESSION_JSON", "").strip())
+                    or (
+                        os.environ.get("GUMROAD_EMAIL", "").strip()
+                        and os.environ.get("GUMROAD_PASSWORD", "").strip()
+                    )
+                    or (get_gumroad_access_token() or "").strip()
+                )
+                if not gumroad_ok:
+                    msg = (
+                        "YOUTUBE_AUTO_EBOOK is enabled but no Gumroad credentials were found. "
+                        "Set `GUMROAD_ACCESS_TOKEN` (recommended) or `GUMROAD_SESSION_JSON` "
+                        "or `GUMROAD_EMAIL`+`GUMROAD_PASSWORD`."
+                    )
                     if require_ebook:
                         raise RuntimeError(msg)
                     warning(msg)
-            finally:
-                for k, v in prev.items():
-                    if v is None:
-                        os.environ.pop(k, None)
-                    else:
-                        os.environ[k] = v
+                    auto_ebook = False
 
-        # Generate the Metadata
-        self.generate_metadata()
+            if auto_ebook:
+                keys = ["EBOOK_TOPIC", "EBOOK_CONTEXT", "EBOOK_SKIP_KDP", "EBOOK_SKIP_PRINT"]
+                prev = {k: os.environ.get(k) for k in keys}
+                try:
+                    os.environ["EBOOK_TOPIC"] = self.subject
+                    os.environ["EBOOK_CONTEXT"] = (self.script or "")[:5000]
+                    os.environ.setdefault("EBOOK_SKIP_KDP", "1")
+                    os.environ.setdefault("EBOOK_SKIP_PRINT", "1")
 
-        # Generate the Image Prompts
-        self.generate_prompts()
+                    eb = EBook()
+                    result = eb.run()
+                    if not result.get("gumroad_url"):
+                        msg = "Companion eBook publish failed (no Gumroad URL). Check `.mp/gumroad_*` debug files and your Gumroad token/settings."
+                        if require_ebook:
+                            raise RuntimeError(msg)
+                        warning(msg)
+                finally:
+                    for k, v in prev.items():
+                        if v is None:
+                            os.environ.pop(k, None)
+                        else:
+                            os.environ[k] = v
 
-        # Generate the Images
-        for prompt in self.image_prompts:
-            self.generate_image(prompt)
+            # Generate the Metadata
+            self.generate_metadata()
 
-        # Generate the TTS
-        self.generate_script_to_speech(tts_instance)
+            # Generate the Image Prompts
+            self.generate_prompts()
 
-        # Combine everything
-        path = self.combine()
+            # Generate the Images
+            for prompt in self.image_prompts:
+                self.generate_image(prompt)
 
-        if get_verbose():
-            info(f" => Generated Video: {path}")
+            # Generate the TTS
+            self.generate_script_to_speech(tts_instance)
 
-        self.video_path = os.path.abspath(path)
+            # Combine everything
+            path = self.combine()
 
-        return path
+            if get_verbose():
+                info(f" => Generated Video: {path}")
+
+            self.video_path = os.path.abspath(path)
+
+            return path
+            
+        except Exception as e:
+            error(f"Video generation failed: {e}")
+            if get_verbose():
+                import traceback
+                traceback.print_exc()
+            raise
 
     @staticmethod
     def _get_yt_credentials():
@@ -866,8 +896,15 @@ Subject: {self.subject}"""
         token_info = None
         if token_json:
             token_info = json.loads(token_json)
-            # Avoid overriding stored scopes; let preflight validate what this token actually grants.
-            creds = Credentials.from_authorized_user_info(token_info)
+            # Create credentials from the token info
+            creds = Credentials(
+                token=token_info.get("token"),
+                refresh_token=token_info.get("refresh_token"),
+                token_uri=token_info.get("token_uri", "https://oauth2.googleapis.com/token"),
+                client_id=token_info.get("client_id"),
+                client_secret=token_info.get("client_secret"),
+                scopes=token_info.get("scopes", required_scopes),
+            )
         else:
             token_path = os.path.join(ROOT_DIR, "token.json")
             if not os.path.exists(token_path):
@@ -876,21 +913,28 @@ Subject: {self.subject}"""
                 )
             with open(token_path, "r", encoding="utf-8") as f:
                 token_info = json.loads(f.read())
-            creds = Credentials.from_authorized_user_file(token_path)
+            creds = Credentials.from_authorized_user_file(token_path, required_scopes)
 
-        # Some token formats store scopes as "scope" (space-delimited) or "scopes" (list).
-        if not getattr(creds, "scopes", None) and isinstance(token_info, dict):
-            raw_scopes = token_info.get("scopes") or token_info.get("scope")
-            if isinstance(raw_scopes, str):
-                creds.scopes = [s for s in raw_scopes.split() if s]
-            elif isinstance(raw_scopes, list):
-                creds.scopes = [str(s) for s in raw_scopes if str(s).strip()]
-
-        # If scopes are missing from the token file entirely, still set the required scope for refresh flows.
-        if not getattr(creds, "scopes", None):
+        # Ensure scopes are set
+        if not creds.scopes:
             creds.scopes = required_scopes
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+        
+        # Always try to refresh if we have a refresh token
+        if creds.refresh_token:
+            try:
+                if creds.expired or not creds.token:
+                    if get_verbose():
+                        info("Refreshing YouTube OAuth token...")
+                    creds.refresh(Request())
+                    # Save refreshed token back to token_info for debugging
+                    if token_json:
+                        token_info["token"] = creds.token
+                        token_info["expiry"] = creds.expiry.isoformat() if creds.expiry else None
+            except Exception as refresh_error:
+                if get_verbose():
+                    warning(f"Token refresh failed: {refresh_error}")
+                # Continue anyway - the existing token might still work
+        
         return creds
 
     def upload_video(self) -> bool:
