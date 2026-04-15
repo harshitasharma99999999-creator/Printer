@@ -33,6 +33,19 @@ def check_url(url: str, timeout: int = 3) -> Tuple[bool, str]:
         return False, str(exc)
 
 
+def find_ffmpeg() -> str:
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if ffmpeg_bin:
+        return ffmpeg_bin
+
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return ""
+
+
 def main() -> int:
     if not os.path.exists(CONFIG_PATH):
         fail(f"Missing config file: {CONFIG_PATH}")
@@ -110,8 +123,7 @@ def main() -> int:
     if api_key:
         ok("nanobanana2_api_key is set")
     else:
-        fail("nanobanana2_api_key is empty (and GEMINI_API_KEY is not set)")
-        failures += 1
+        warn("nanobanana2_api_key is empty (and GEMINI_API_KEY is not set). The app will fall back to Picsum images.")
 
     reachable, detail = check_url(nb2_base, timeout=8)
     if not reachable:
@@ -125,14 +137,17 @@ def main() -> int:
 
             ok("faster-whisper is installed")
         except Exception as exc:
-            fail(f"faster-whisper is not importable: {exc}")
-            failures += 1
+            warn(
+                "faster-whisper is not importable: "
+                f"{exc}. Short generation will continue without subtitles unless you install it."
+            )
 
     # ffmpeg (required for MoviePy + long-form subtitle burn)
-    if shutil.which("ffmpeg"):
-        ok("ffmpeg is available on PATH")
+    ffmpeg_bin = find_ffmpeg()
+    if ffmpeg_bin:
+        ok(f"ffmpeg is available: {ffmpeg_bin}")
     else:
-        fail("ffmpeg not found on PATH. Video rendering/upload pipelines will fail.")
+        fail("ffmpeg not found. TTS post-processing and some video flows will fail until ffmpeg is installed.")
         failures += 1
 
     # YouTube auth (required for uploads)

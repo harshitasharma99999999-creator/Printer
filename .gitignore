@@ -8,6 +8,13 @@ geckodriver.log
 *.wav
 .mp/
 venv/
+venv312/
+.tmp/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+webapp/
+api/
 Songs/
 google-maps-scraper-0.9.7/
 niche.txt

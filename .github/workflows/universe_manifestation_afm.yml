@@ -90,6 +90,14 @@ jobs:
           ]}
           EOF
 
+      - name: Preflight (YouTube token + API)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
+        run: python scripts/preflight_local.py
+
       - name: Run AFM pipeline
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

@@ -4,7 +4,6 @@ import json
 import time
 import os
 import requests
-import assemblyai as aai
 
 from utils import *
 from cache import *
@@ -531,23 +530,40 @@ Subject: {self.subject}"""
         Returns:
             None
         """
-        videos = self.get_videos()
-        videos.append(video)
-
         cache = get_youtube_cache_path()
 
-        with open(cache, "r") as file:
+        if not os.path.exists(cache):
+            with open(cache, "w", encoding="utf-8") as file:
+                json.dump({"accounts": []}, file, indent=4)
+
+        with open(cache, "r", encoding="utf-8") as file:
             previous_json = json.loads(file.read())
 
             # Find our account
-            accounts = previous_json["accounts"]
+            accounts = previous_json.get("accounts", [])
+            found = False
             for account in accounts:
                 if account["id"] == self._account_uuid:
-                    account["videos"].append(video)
+                    account.setdefault("videos", []).append(video)
+                    found = True
+                    break
+
+            if not found:
+                accounts.append(
+                    {
+                        "id": self._account_uuid,
+                        "nickname": self._account_nickname,
+                        "firefox_profile": self._fp_profile_path,
+                        "niche": self._niche,
+                        "language": self._language,
+                        "videos": [video],
+                    }
+                )
+                previous_json["accounts"] = accounts
 
             # Commit changes
-            with open(cache, "w") as f:
-                f.write(json.dumps(previous_json))
+            with open(cache, "w", encoding="utf-8") as f:
+                json.dump(previous_json, f, indent=4)
 
     def generate_subtitles(self, audio_path: str) -> str:
         """
@@ -580,6 +596,13 @@ Subject: {self.subject}"""
         Returns:
             path (str): Path to SRT file
         """
+        try:
+            import assemblyai as aai
+        except ImportError as exc:
+            raise RuntimeError(
+                "AssemblyAI subtitles require the 'assemblyai' package to be installed."
+            ) from exc
+
         aai.settings.api_key = get_assemblyai_api_key()
         config = aai.TranscriptionConfig()
         transcriber = aai.Transcriber(config=config)
@@ -891,20 +914,12 @@ Subject: {self.subject}"""
         from google.auth.transport.requests import Request
 
         required_scopes = ["https://www.googleapis.com/auth/youtube.upload"]
-        token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
+        token_json = os.environ.get("YOUTUBE_TOKEN_JSON", "").strip()
 
         token_info = None
         if token_json:
             token_info = json.loads(token_json)
-            # Create credentials from the token info
-            creds = Credentials(
-                token=token_info.get("token"),
-                refresh_token=token_info.get("refresh_token"),
-                token_uri=token_info.get("token_uri", "https://oauth2.googleapis.com/token"),
-                client_id=token_info.get("client_id"),
-                client_secret=token_info.get("client_secret"),
-                scopes=token_info.get("scopes", required_scopes),
-            )
+            creds = Credentials.from_authorized_user_info(token_info)
         else:
             token_path = os.path.join(ROOT_DIR, "token.json")
             if not os.path.exists(token_path):
@@ -913,28 +928,28 @@ Subject: {self.subject}"""
                 )
             with open(token_path, "r", encoding="utf-8") as f:
                 token_info = json.loads(f.read())
-            creds = Credentials.from_authorized_user_file(token_path, required_scopes)
+            creds = Credentials.from_authorized_user_file(token_path)
+
+        if not getattr(creds, "scopes", None) and isinstance(token_info, dict):
+            raw_scopes = token_info.get("scopes") or token_info.get("scope")
+            if isinstance(raw_scopes, str):
+                creds.scopes = [s for s in raw_scopes.split() if s]
+            elif isinstance(raw_scopes, list):
+                creds.scopes = [str(s) for s in raw_scopes if str(s).strip()]
 
         # Ensure scopes are set
-        if not creds.scopes:
+        if not getattr(creds, "scopes", None):
             creds.scopes = required_scopes
-        
-        # Always try to refresh if we have a refresh token
-        if creds.refresh_token:
+
+        if creds.expired and creds.refresh_token:
             try:
-                if creds.expired or not creds.token:
-                    if get_verbose():
-                        info("Refreshing YouTube OAuth token...")
-                    creds.refresh(Request())
-                    # Save refreshed token back to token_info for debugging
-                    if token_json:
-                        token_info["token"] = creds.token
-                        token_info["expiry"] = creds.expiry.isoformat() if creds.expiry else None
+                if get_verbose():
+                    info("Refreshing YouTube OAuth token...")
+                creds.refresh(Request())
             except Exception as refresh_error:
                 if get_verbose():
                     warning(f"Token refresh failed: {refresh_error}")
-                # Continue anyway - the existing token might still work
-        
+
         return creds
 
     def upload_video(self) -> bool:
@@ -950,6 +965,17 @@ Subject: {self.subject}"""
         from utils import format_youtube_http_error
 
         try:
+            if not getattr(self, "video_path", None):
+                raise RuntimeError("No rendered video found. Run generate_video() before upload.")
+            if not os.path.exists(self.video_path):
+                raise FileNotFoundError(f"Rendered video not found: {self.video_path}")
+            if not getattr(self, "metadata", None):
+                if not getattr(self, "subject", None):
+                    raise RuntimeError("Video subject is missing, so metadata cannot be generated.")
+                if not getattr(self, "script", None):
+                    self.script = getattr(self, "subject", "")
+                self.generate_metadata()
+
             creds = self._get_yt_credentials()
             youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
             verbose = get_verbose()
@@ -1015,20 +1041,21 @@ Subject: {self.subject}"""
         Returns:
             videos (List[dict]): The uploaded videos.
         """
-        if not os.path.exists(get_youtube_cache_path()):
+        cache_path = get_youtube_cache_path()
+        if not os.path.exists(cache_path):
             # Create the cache file
-            with open(get_youtube_cache_path(), "w") as file:
-                json.dump({"videos": []}, file, indent=4)
+            with open(cache_path, "w", encoding="utf-8") as file:
+                json.dump({"accounts": []}, file, indent=4)
             return []
 
         videos = []
         # Read the cache file
-        with open(get_youtube_cache_path(), "r") as file:
+        with open(cache_path, "r", encoding="utf-8") as file:
             previous_json = json.loads(file.read())
             # Find our account
-            accounts = previous_json["accounts"]
+            accounts = previous_json.get("accounts", [])
             for account in accounts:
                 if account["id"] == self._account_uuid:
-                    videos = account["videos"]
+                    videos = account.get("videos", [])
 
         return videos
