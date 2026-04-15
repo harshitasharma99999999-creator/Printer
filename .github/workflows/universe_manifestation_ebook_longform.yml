@@ -95,20 +95,20 @@ jobs:
           GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
         run: python scripts/preflight_local.py
 
-      - name: Run eBook pipeline (Universe Manifestation)
+      - name: Run eBook pipeline (Universe Manifestation) [Gumroad-first]
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GUMROAD_ACCESS_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           GUMROAD_SESSION_JSON: ${{ secrets.GUMROAD_SESSION_JSON }}
           GUMROAD_EMAIL: ${{ secrets.GUMROAD_EMAIL }}
           GUMROAD_PASSWORD: ${{ secrets.GUMROAD_PASSWORD }}
-          KDP_EMAIL: ${{ secrets.KDP_EMAIL }}
-          KDP_PASSWORD: ${{ secrets.KDP_PASSWORD }}
-          KDP_TOTP_SECRET: ${{ secrets.KDP_TOTP_SECRET }}
-          KDP_SESSION_JSON: ${{ secrets.KDP_SESSION_JSON }}
-          KDP_PUBLISH_PAPERBACK: "true"
-          KDP_PUBLISH_HARDCOVER: "true"
-          REQUIRE_KDP_PUBLISH: "true"
+          # KDP is brittle in GitHub Actions (2FA/anti-bot/headless changes).
+          # Keep the automation reliable by skipping KDP in CI; run KDP locally when needed.
+          EBOOK_SKIP_KDP: "true"
+          EBOOK_SKIP_PRINT: "true"
+          KDP_PUBLISH_PAPERBACK: "false"
+          KDP_PUBLISH_HARDCOVER: "false"
+          REQUIRE_KDP_PUBLISH: "false"
           KDP_PRINT_TRIM_SIZE: "6x9"
           KDP_PRINT_PAPER: "cream"
           EBOOK_TOPIC: "manifestation and law of attraction"
