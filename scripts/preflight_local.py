@@ -160,7 +160,7 @@ def main() -> int:
         else:
             warn("YouTube token not found (token.json / YOUTUBE_TOKEN_JSON). Uploads will fail until auth is set up.")
 
-    # YouTube Data API enabled + token works (required for uploads)
+    # YouTube Data API enabled + token works (best-effort for uploads)
     try:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
@@ -168,6 +168,11 @@ def main() -> int:
         from googleapiclient.errors import HttpError
 
         REQUIRED_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        READ_SCOPES = [
+            "https://www.googleapis.com/auth/youtube.readonly",
+            "https://www.googleapis.com/auth/youtube",
+            "https://www.googleapis.com/auth/youtube.force-ssl",
+        ]
         token_json = os.environ.get("YOUTUBE_TOKEN_JSON")
         token_path = os.path.join(ROOT_DIR, "token.json")
 
@@ -193,12 +198,18 @@ def main() -> int:
 
             youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
             try:
-                resp = youtube.channels().list(part="id", mine=True).execute()
-                chan_id = ""
-                items = resp.get("items") or []
-                if items:
-                    chan_id = str(items[0].get("id") or "")
-                ok(f"YouTube API access OK (channel_id={chan_id or 'unknown'})")
+                # `youtube.upload` is sufficient for uploads, but may not allow reading channel info.
+                # Only probe `channels().list(mine=True)` when the token also has a read scope.
+                can_read = callable(getattr(creds, "has_scopes", None)) and creds.has_scopes(READ_SCOPES)
+                if can_read:
+                    resp = youtube.channels().list(part="id", mine=True).execute()
+                    chan_id = ""
+                    items = resp.get("items") or []
+                    if items:
+                        chan_id = str(items[0].get("id") or "")
+                    ok(f"YouTube API access OK (channel_id={chan_id or 'unknown'})")
+                else:
+                    ok("YouTube token has upload scope; skipping channel probe (no read scope).")
             except HttpError as exc:
                 raw = ""
                 reason = ""
@@ -226,9 +237,13 @@ def main() -> int:
                         "If you don't have access to that project, create a new OAuth client in a project you own "
                         "and regenerate `YOUTUBE_TOKEN_JSON`."
                     )
+                    failures += 1
+                elif reason == "insufficientPermissions":
+                    # Non-blocking: uploads can still work with `youtube.upload` scope.
+                    warn("YouTube API probe warning: insufficientPermissions (uploads may still work).")
                 else:
                     fail(f"YouTube API access failed: {reason or msg}")
-                failures += 1
+                    failures += 1
     except Exception as exc:
         # Don't hard-fail preflight if the deps aren't installed (e.g., before pip install).
         warn(f"Skipped YouTube API access check: {exc}")

@@ -190,7 +190,7 @@ def preflight_youtube_api(creds, *, verbose: bool) -> None:
     from googleapiclient.errors import HttpError
 
     try:
-        # Scope check: channels().list can succeed on readonly tokens; uploads require youtube.upload.
+        # Scope check: uploads require youtube.upload.
         required_scopes = ["https://www.googleapis.com/auth/youtube.upload"]
         has_scopes = getattr(creds, "has_scopes", None)
         if callable(has_scopes) and not creds.has_scopes(required_scopes):
@@ -205,10 +205,32 @@ def preflight_youtube_api(creds, *, verbose: bool) -> None:
             )
 
         youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
-        youtube.channels().list(part="id", mine=True).execute()
+
+        # Some tokens only include `youtube.upload`. That scope is sufficient to upload,
+        # but it may not allow `channels().list(mine=True)` which can yield `insufficientPermissions`.
+        # Only run the channel probe when the token has a read scope, otherwise skip it.
+        read_scopes = [
+            "https://www.googleapis.com/auth/youtube.readonly",
+            "https://www.googleapis.com/auth/youtube",
+            "https://www.googleapis.com/auth/youtube.force-ssl",
+        ]
+        can_read = (callable(has_scopes) and creds.has_scopes(read_scopes)) if callable(has_scopes) else True
+        if can_read:
+            youtube.channels().list(part="id", mine=True).execute()
         if verbose:
             info("YouTube API preflight OK.")
     except HttpError as exc:
+        # Treat `insufficientPermissions` as non-blocking if upload scope is present,
+        # because the upload call itself can still succeed.
+        parsed = _parse_google_http_error(exc)
+        reason = (parsed.get("reason") or "").strip()
+        if reason == "insufficientPermissions":
+            if verbose:
+                warning(
+                    "YouTube API preflight warning: insufficientPermissions for the channel probe. "
+                    "Uploads can still work with `youtube.upload` scope."
+                )
+            return
         raise RuntimeError(format_youtube_http_error(exc)) from exc
 
 
