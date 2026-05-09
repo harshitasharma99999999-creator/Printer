@@ -36,7 +36,10 @@ def main():
         info(f"Instagram: uploading {video_path}")
 
     # Build caption from the latest video's subject stored in youtube.json
-    caption = "#motivation #mindset #consciousness #shorts #reels #viral #fyp"
+    caption = (
+        "#manifestation #lawofattraction #mindset #motivation "
+        "#spirituality #consciousness #healing #selfgrowth #reels #viral"
+    )
     subject = ""
     try:
         yt_json = os.path.join(mp_dir, "youtube.json")
@@ -50,7 +53,8 @@ def main():
                 if subject:
                     caption = (
                         f"{subject}\n\n"
-                        "#motivation #mindset #consciousness #shorts #reels #viral #fyp"
+                        "#manifestation #lawofattraction #mindset #motivation "
+                        "#spirituality #consciousness #healing #selfgrowth #reels #viral"
                     )
     except Exception:
         pass

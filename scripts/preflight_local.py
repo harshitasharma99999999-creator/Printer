@@ -160,6 +160,25 @@ def main() -> int:
         else:
             warn("YouTube token not found (token.json / YOUTUBE_TOKEN_JSON). Uploads will fail until auth is set up.")
 
+    # Gumroad credentials (required only when the workflow expects companion eBook publishing)
+    gumroad_access_token = (
+        str(cfg.get("gumroad_access_token", "")).strip()
+        or os.environ.get("GUMROAD_ACCESS_TOKEN", "").strip()
+    )
+    gumroad_session_json = os.environ.get("GUMROAD_SESSION_JSON", "").strip()
+    gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
+    if gumroad_access_token:
+        ok("GUMROAD_ACCESS_TOKEN is set")
+    elif gumroad_session_json:
+        ok("GUMROAD_SESSION_JSON is set")
+    elif gumroad_email:
+        ok("GUMROAD_EMAIL is set")
+    else:
+        warn(
+            "No Gumroad credentials found. Companion eBook publishing will be skipped "
+            "unless you set GUMROAD_ACCESS_TOKEN, GUMROAD_SESSION_JSON, or GUMROAD_EMAIL."
+        )
+
     # YouTube Data API enabled + token works (best-effort for uploads)
     try:
         from google.oauth2.credentials import Credentials

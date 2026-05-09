@@ -15,6 +15,7 @@ from uuid import uuid4
 from constants import *
 from typing import List
 from moviepy.editor import *
+from moviepy.config import change_settings
 from moviepy.video.fx.crop import crop as mpy_crop
 from termcolor import colored
 from moviepy.video.tools.subtitles import SubtitlesClip
@@ -64,6 +65,8 @@ class YouTube:
         self._language: str = language
 
         self.images = []
+        os.environ["IMAGEMAGICK_BINARY"] = get_imagemagick_path()
+        change_settings({"IMAGEMAGICK_BINARY": get_imagemagick_path()})
 
     def set_subject(self, subject: str) -> None:
         """Override topic generation with a specific subject (e.g. product name)."""
@@ -271,6 +274,21 @@ Subject: {self.subject}"""
         
         # Parse tags from response
         tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+        broad_tags = [
+            "manifestation",
+            "law of attraction",
+            "spiritual awakening",
+            "mindset",
+            "motivation",
+            "self improvement",
+            "consciousness",
+            "healing",
+            "energy",
+            "shorts",
+        ]
+        for tag in broad_tags:
+            if tag.lower() not in {t.lower() for t in tags}:
+                tags.append(tag)
         tags = tags[:15]  # YouTube allows max 15 tags
         
         affiliate_link = self._get_product_affiliate_link()
@@ -301,8 +319,11 @@ Subject: {self.subject}"""
             pass
 
         # #Shorts tag is required for YouTube to classify vertical videos as Shorts
+        broad_hashtags = "#Shorts #Manifestation #LawOfAttraction #Motivation #Mindset"
         if "#Shorts" not in description and "#shorts" not in description:
-            description += "\n\n#Shorts #Short"
+            description += f"\n\n{broad_hashtags}"
+        elif "#Manifestation" not in description and "#manifestation" not in description:
+            description += "\n#Manifestation #LawOfAttraction #Motivation #Mindset"
 
         self.metadata = {"title": title, "description": description, "tags": tags}
 

@@ -11,7 +11,10 @@ import os
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES  = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES  = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube",
+]
 ROOT    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRETS = os.path.join(ROOT, "client_secrets.json")
 TOKEN   = os.path.join(ROOT, "token.json")

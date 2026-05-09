@@ -2291,11 +2291,19 @@ p  { margin-bottom: 0.8em; text-align: justify; }
 
         gumroad_url = ""
         if not skip_gumroad:
-            _gumroad_ok = get_gumroad_access_token() or os.environ.get("GUMROAD_EMAIL", "").strip()
-            if _gumroad_ok:
+            gumroad_access_token = (
+                get_gumroad_access_token()
+                or os.environ.get("GUMROAD_ACCESS_TOKEN", "").strip()
+            )
+            gumroad_session_json = os.environ.get("GUMROAD_SESSION_JSON", "").strip()
+            gumroad_email = os.environ.get("GUMROAD_EMAIL", "").strip()
+            if gumroad_access_token or gumroad_session_json or gumroad_email:
                 gumroad_url = self.publish_to_gumroad()
             else:
-                warning("Skipping Gumroad (no access token or GUMROAD_EMAIL). Set gumroad_access_token in config.json.")
+                warning(
+                    "Skipping Gumroad (no GUMROAD_ACCESS_TOKEN, GUMROAD_SESSION_JSON, "
+                    "or GUMROAD_EMAIL configured)."
+                )
 
         # Persist last eBook URL for cross-promotion in video/reel pipelines
         if gumroad_url:

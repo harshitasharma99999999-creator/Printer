@@ -9,15 +9,8 @@ from config import *
 from status import *
 from uuid import uuid4
 from constants import *
-from classes.Tts import TTS
 from termcolor import colored
-from classes.Twitter import Twitter
-from classes.YouTube import YouTube
 from prettytable import PrettyTable
-from classes.Outreach import Outreach
-from classes.AFM import AffiliateMarketing
-from classes.EBook import EBook
-from classes.LongForm import LongForm, LONG_FORM_NICHES
 from llm_provider import list_models, select_model, get_active_model
 
 def main():
@@ -141,6 +134,8 @@ def main():
                 error("Invalid account selected. Please try again.", "red")
                 main()
             else:
+                from classes.YouTube import YouTube
+
                 youtube = YouTube(
                     selected_account["id"],
                     selected_account["nickname"],
@@ -160,9 +155,11 @@ def main():
 
                     # Get user input
                     user_input = int(question("Select an option: "))
-                    tts = TTS()
 
                     if user_input == 1:
+                        from classes.Tts import TTS
+
+                        tts = TTS()
                         youtube.generate_video(tts)
                         upload_to_yt = question("Do you want to upload this video to YouTube? (Yes/No): ")
                         if upload_to_yt.lower() == "yes":
@@ -239,6 +236,8 @@ def main():
         if len(cached_accounts) == 0:
             warning("No YouTube accounts found. Add one via YouTube Shorts menu first.")
         else:
+            from classes.LongForm import LongForm, LONG_FORM_NICHES
+
             # Account selection
             table = PrettyTable()
             table.field_names = ["#", "Nickname", "Niche"]
@@ -387,6 +386,8 @@ def main():
                 error("Invalid account selected. Please try again.", "red")
                 main()
             else:
+                from classes.Twitter import Twitter
+
                 twitter = Twitter(selected_account["id"], selected_account["nickname"], selected_account["firefox_profile"], selected_account["topic"])
 
                 while True:
@@ -481,6 +482,8 @@ def main():
                     "twitter_uuid": twitter_uuid
                 })
 
+                from classes.AFM import AffiliateMarketing
+
                 afm = AffiliateMarketing(affiliate_link, account["firefox_profile"], account["id"], account["nickname"], account["topic"])
 
                 afm.generate_pitch()
@@ -506,6 +509,8 @@ def main():
                 error("Invalid product selected. Please try again.", "red")
                 main()
             else:
+                from classes.AFM import AffiliateMarketing
+
                 # Find the account
                 account = None
                 for acc in get_accounts("twitter"):
@@ -521,6 +526,9 @@ def main():
                 if not yt_accounts:
                     error("No YouTube accounts found. Add one via the YouTube Shorts menu first.")
                 else:
+                    from classes.Tts import TTS
+                    from classes.YouTube import YouTube
+
                     yt_account = yt_accounts[0]
                     tts = TTS()
                     youtube = YouTube(
@@ -571,6 +579,8 @@ def main():
     elif user_input == 5:
         info("Starting Outreach...")
 
+        from classes.Outreach import Outreach
+
         outreach = Outreach()
 
         outreach.start()
@@ -590,6 +600,8 @@ def main():
                 continue
 
             if ebook_input == 1:
+                from classes.EBook import EBook
+
                 ebook = EBook()
                 result = ebook.run()
                 add_published_ebook(result)
@@ -628,6 +640,8 @@ def main():
 
                 def run_ebook_cron():
                     try:
+                        from classes.EBook import EBook
+
                         eb = EBook()
                         res = eb.run()
                         add_published_ebook(res)
