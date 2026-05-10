@@ -83,7 +83,7 @@ jobs:
         run: |
           mkdir -p .mp
           cat > .mp/youtube.json << 'EOF'
-          {"accounts": [{"id": "human-psychology-channel", "nickname": "human-psychology", "firefox_profile": "", "niche": "human psychology behavior relationships emotional intelligence self awareness dark psychology body language", "language": "english", "videos": []}]}
+          {"accounts": [{"id": "human-psychology-channel", "nickname": "human-psychology", "firefox_profile": "", "niche": "real human psychology dark truth about people human behavior emotional patterns hidden motives self deception relationships power insecurity body language", "language": "english", "videos": []}]}
           EOF
 
       - name: Preflight (YouTube token + API)
@@ -98,7 +98,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.HUMAN_PSYCHOLOGY_YOUTUBE_TOKEN_JSON }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SHORTS_NICHE: "human psychology behavior relationships emotional intelligence self awareness dark psychology body language"
+          SHORTS_NICHE: "real human psychology dark truth about people human behavior emotional patterns hidden motives self deception relationships power insecurity body language"
           YOUTUBE_AUTO_EBOOK: "false"
         run: python src/cron.py youtube human-psychology-channel
 

@@ -67,11 +67,34 @@ class LongForm:
 
         os.environ["IMAGEMAGICK_BINARY"] = get_imagemagick_path()
 
+    def _is_psychology_channel(self) -> bool:
+        niche = (self.niche or "").lower()
+        return "psychology" in niche or "behavior" in niche or "dark truth" in niche
+
     # ------------------------------------------------------------------
     # Step 1: Topic
     # ------------------------------------------------------------------
 
     def generate_topic(self) -> str:
+        if self._is_psychology_channel():
+            prompt = (
+                f"Generate ONE compelling long-form YouTube video topic (10-15 minutes) about {self.niche}.\n"
+                f"Style: real human psychology, dark truths, hidden motives, emotional patterns, attachment, insecurity, manipulation, power, attraction, and self-deception.\n"
+                f"The topic must feel intense, insightful, and highly clickable without sounding fake.\n"
+                f"Examples:\n"
+                f"'The Dark Truth About Why People Change When They Gain Power'\n"
+                f"'What Emotional Unavailability Really Reveals About A Person'\n"
+                f"'Why People Only Respect Boundaries They Fear'\n"
+                f"'The Brutal Psychology Of Validation, Silence, And Control'\n"
+                f"'How Insecurity Secretly Shapes Relationships And Status'\n"
+                f"Return ONLY the topic, nothing else."
+            )
+            raw = generate_text(prompt).strip()
+            self.subject = next(
+                (l.strip().strip('"').strip("'") for l in raw.splitlines() if l.strip()),
+                raw.split(".")[0].strip()
+            )
+            return self.subject
         prompt = (
             f"You are the creator of 'YourInnerGuide' — a channel that reveals ultimate spiritual truths to help people shift their reality.\n"
             f"Generate ONE deeply meaningful long-form YouTube video topic (10-15 minutes) about {self.niche}.\n"
@@ -98,6 +121,55 @@ class LongForm:
 
     def generate_script(self) -> str:
         parts = []
+        if self._is_psychology_channel():
+            hook = generate_text(
+                f"Write a 4-sentence opening for a dark human psychology long-form YouTube video about: {self.subject}.\n"
+                f"Sentence 1: open with an uncomfortable truth about people that creates immediate curiosity.\n"
+                f"Sentence 2: reveal the hidden emotional or behavioral pattern behind it.\n"
+                f"Sentence 3: make it personal so the viewer feels they have seen this in their own life.\n"
+                f"Sentence 4: promise a deeper understanding of what people rarely say out loud.\n"
+                f"Language: {self.language}. No markdown. Spoken words only."
+            ).strip()
+            parts.append(hook)
+
+            outline_raw = generate_text(
+                f"List exactly 5 section titles for a 12-minute YouTube video about: {self.subject}.\n"
+                f"Style: human psychology, dark truths, behavior patterns, emotional insight, relationships, power, and self-deception.\n"
+                f"Format: numbered list 1-5. No explanations."
+            ).strip()
+            section_titles = []
+            for line in outline_raw.splitlines():
+                m = re.match(r"^\d+[\.\)]\s*(.+)", line.strip())
+                if m:
+                    section_titles.append(m.group(1).strip())
+            if len(section_titles) < 5:
+                section_titles = [
+                    "The Hidden Pattern Most People Miss",
+                    "What This Behavior Is Really Protecting",
+                    "How Power, Fear, And Validation Shape People",
+                    "Why This Pattern Repeats In Relationships",
+                    "What To See Clearly From Now On",
+                ]
+
+            for title in section_titles[:5]:
+                section = generate_text(
+                    f"Write 6 insightful spoken sentences for the section '{title}' in a long-form video about: {self.subject}.\n"
+                    f"Tone: sharp, calm, observant, psychologically accurate.\n"
+                    f"Focus on real motives, insecurity, validation, control, attraction, fear, ego, and self-deception where relevant.\n"
+                    f"Language: {self.language}. No markdown. No headers. Spoken words only."
+                ).strip()
+                parts.append(section)
+
+            cta = generate_text(
+                f"Write a 3-sentence closing for a YouTube video about: {self.subject}.\n"
+                f"Ask the viewer to like, comment with their observation, and subscribe for more human psychology content.\n"
+                f"Tone: direct, reflective, strong. Language: {self.language}. Spoken words only."
+            ).strip()
+            parts.append(cta)
+
+            raw = "\n\n".join(p for p in parts if p)
+            self.script = self._clean_script(raw)
+            return self.script
 
         # Hook — SCROLL-STOPPING, commanding male narrator energy
         hook = generate_text(
@@ -211,6 +283,46 @@ class LongForm:
     # ------------------------------------------------------------------
 
     def generate_metadata(self) -> dict:
+        if self._is_psychology_channel():
+            title = generate_text(
+                f"Write a YouTube video title for: {self.subject}.\n"
+                f"Make it SEO-optimized, emotionally sharp, and highly clickable for a human psychology audience. Under 70 characters.\n"
+                f"Use dark-truth framing when natural. Return ONLY the title, no quotes."
+            ).strip().strip('"').strip("'")
+            if len(title) > 100:
+                title = title[:97] + "..."
+
+            description = generate_text(
+                f"Write a YouTube video description for a video titled '{title}' about: {self.subject}.\n"
+                f"Include SEO keywords around psychology, human behavior, dark psychology, relationships, emotional intelligence, and self-awareness naturally.\n"
+                f"150-200 words. No markdown.\n"
+                f"End with: Subscribe for more human psychology insights."
+            ).strip()
+
+            description += "\n\n#HumanPsychology #DarkPsychology #Psychology #HumanBehavior #SelfAwareness"
+
+            affiliate = get_affiliate_link()
+            if affiliate:
+                description += f"\n\nRecommended:\n{affiliate}"
+
+            try:
+                from marketing import build_youtube_description, get_latest_ebook_url
+
+                mp_dir = os.path.join(ROOT_DIR, ".mp")
+                ebook_url = get_latest_ebook_url(mp_dir)
+                description = build_youtube_description(
+                    base_description=description,
+                    topic=self.subject,
+                    ebook_url=ebook_url,
+                    affiliate_link=affiliate,
+                    include_disclosure=True,
+                    is_shorts=False,
+                )
+            except Exception:
+                pass
+
+            self.metadata = {"title": title, "description": description}
+            return self.metadata
         title = generate_text(
             f"Write a YouTube video title for: {self.subject}.\n"
             f"Make it SEO-optimized, emotional, and highly clickable. Under 70 characters.\n"
@@ -257,6 +369,31 @@ class LongForm:
     # ------------------------------------------------------------------
 
     def generate_image_prompts(self) -> List[str]:
+        if self._is_psychology_channel():
+            raw = generate_text(
+                f"Generate 8 CINEMATIC 16:9 image prompts for a human psychology YouTube video about: {self.subject}.\n"
+                f"Style: realistic, emotionally intense, dark but tasteful, dramatic lighting, expressive faces, tense body language, mirrors, isolation, status dynamics, relationship distance, subtle symbolism.\n"
+                f"No fantasy, no monsters, no gore. Keep it grounded in real human emotion and behavior.\n"
+                f"Return as JSON array of 8 strings only. Example: [\"scene1\", \"scene2\"]"
+            ).strip()
+            m = re.search(r"\[.*?\]", raw, re.DOTALL)
+            if m:
+                try:
+                    prompts = json.loads(m.group(0))
+                    if isinstance(prompts, list) and prompts:
+                        return [str(p) for p in prompts[:8]]
+                except Exception:
+                    pass
+            return [
+                f"realistic cinematic portrait of hidden emotion and guarded expression, human psychology theme, {self.subject}",
+                f"two people together but emotionally distant, tense body language, moody cinematic lighting, {self.subject}",
+                f"person alone at night overthinking messages, urban lights blurred in background, realistic, {self.subject}",
+                f"mirror reflection showing inner conflict and self-deception, dramatic realism, {self.subject}",
+                f"close-up eyes revealing fear, desire, and insecurity, cinematic portrait, {self.subject}",
+                f"power dynamic in a conversation, subtle status tension, realistic human behavior, {self.subject}",
+                f"isolated figure in a crowded room, emotional disconnection, cinematic realism, {self.subject}",
+                f"symbolic scene of attachment and control, grounded realistic style, {self.subject}",
+            ]
         raw = generate_text(
             f"Generate 8 CINEMATIC 16:9 image prompts for a dark psychological YouTube video about: {self.subject}.\n"
             f"Style: epic movie-quality, dark and dramatic, hyper-realistic, emotional power.\n"

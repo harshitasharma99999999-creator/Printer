@@ -72,6 +72,10 @@ class YouTube:
         """Override topic generation with a specific subject (e.g. product name)."""
         self.subject = subject
 
+    def _is_psychology_channel(self) -> bool:
+        niche = (self.niche or "").lower()
+        return "psychology" in niche or "behavior" in niche or "dark truth" in niche
+
     @property
     def niche(self) -> str:
         """
@@ -111,6 +115,24 @@ class YouTube:
         Returns:
             topic (str): The generated topic.
         """
+        if self._is_psychology_channel():
+            completion = self.generate_response(
+                f"""Generate a compelling YouTube Shorts topic about: {self.niche}
+Style: real human psychology, dark truths, emotional patterns, hidden motives, self-deception, power, attachment, attraction, insecurity, status, respect, and manipulation.
+Use formats like:
+- "The Dark Truth About Why People Pull Away"
+- "What Silence Really Means In Human Psychology"
+- "Why People Respect You Less When You Do This"
+- "The Brutal Psychology Of Attention And Validation"
+- "What Insecurity Makes People Hide"
+- "The Dark Side Of People Pleasing"
+- "Why Some People Only Value You After Losing You"
+Return ONLY the video topic as one sentence. Nothing else."""
+            )
+            if not completion:
+                error("Failed to generate Topic.")
+            self.subject = completion
+            return completion
         completion = self.generate_response(
             f"""Generate a compelling YouTube Shorts topic about: {self.niche}
 Style: like the channel "YourInnerGuide" — deep, guiding, truth-revealing. The video must feel like a personal spiritual guide is speaking directly to the viewer, revealing an ultimate truth that changes how they see reality.
@@ -140,6 +162,39 @@ Return ONLY the video topic as one sentence. Nothing else."""
             script (str): The script of the video.
         """
         sentence_length = get_script_sentence_length()
+        if self._is_psychology_channel():
+            prompt = f"""You are a sharp human psychology storyteller.
+Write a script of exactly {sentence_length} sentences about the subject below.
+
+Tone:
+- Direct, emotionally intelligent, and insight-heavy
+- Focus on real human behavior and uncomfortable truths
+- Make the viewer feel understood, exposed, and more aware
+- FIRST SENTENCE must hit with a dark but accurate truth that stops attention immediately
+- Each sentence should reveal a deeper layer of motive, insecurity, desire, attachment, fear, or self-deception
+- End with a strong insight that helps the viewer read people and themselves more clearly
+
+Rules:
+- Exactly {sentence_length} sentences
+- NO markdown, NO titles, NO bullet points
+- NO filler, NO intro phrases like "in this video"
+- Spoken words only
+- Use YOU and PEOPLE naturally
+- Stay grounded in psychology, behavior, emotional patterns, and dark truths
+- Language: {self.language}
+
+Subject: {self.subject}"""
+            completion = self.generate_response(prompt)
+            completion = re.sub(r"\*", "", completion)
+            if not completion:
+                error("The generated script is empty.")
+                return
+            if len(completion) > 5000:
+                if get_verbose():
+                    warning("Generated Script is too long. Retrying...")
+                return self.generate_script()
+            self.script = completion
+            return completion
         prompt = f"""You are a deeply wise spiritual guide — calm, certain, and profound. Your words carry the weight of ultimate truth. You are like "YourInnerGuide" on YouTube.
 Write a script of exactly {sentence_length} sentences about the subject below.
 
@@ -245,6 +300,85 @@ Subject: {self.subject}"""
         Returns:
             metadata (dict): The generated metadata.
         """
+        if self._is_psychology_channel():
+            title = self.generate_response(
+                f"""Generate a YouTube video title for the following subject.
+Style: human psychology channel focused on dark truths, behavior patterns, and emotional insight.
+Use formats like:
+"The Dark Truth About X", "Why People X", "What X Really Means", "The Brutal Psychology Of X"
+Include 2-3 hashtags like #Psychology #HumanBehavior #DarkPsychology
+Only return the title. Under 100 characters.
+Subject: {self.subject}"""
+            )
+
+            if len(title) > 100:
+                if get_verbose():
+                    warning("Generated Title is too long. Retrying...")
+                return self.generate_metadata()
+
+            description = self.generate_response(
+                f"Please generate a YouTube Video Description for the following script: {self.script}. "
+                f"Tone: calm, confident, insightful, and psychologically sharp. No hype. No markdown. "
+                f"Only return the description, nothing else."
+            )
+
+            tags_response = self.generate_response(
+                f"Generate 10-15 relevant YouTube tags for a video about: {self.subject}. "
+                f"Return ONLY a comma-separated list of tags, nothing else. "
+                f"Tags should be short (1-3 words), relevant to psychology, human behavior, and emotional truth."
+            )
+
+            tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+            broad_tags = [
+                "human psychology",
+                "dark psychology",
+                "human behavior",
+                "body language",
+                "emotional intelligence",
+                "relationships",
+                "self awareness",
+                "psychology facts",
+                "mindset",
+                "shorts",
+            ]
+            for tag in broad_tags:
+                if tag.lower() not in {t.lower() for t in tags}:
+                    tags.append(tag)
+            tags = tags[:15]
+
+            affiliate_link = self._get_product_affiliate_link()
+            if affiliate_link:
+                description += f"\n\nRecommended -> {affiliate_link}"
+                try:
+                    with open(os.path.join(ROOT_DIR, ".mp", "affiliate_link.txt"), "w") as _f:
+                        _f.write(affiliate_link)
+                except Exception:
+                    pass
+
+            try:
+                from marketing import build_youtube_description, get_latest_ebook_url
+
+                mp_dir = os.path.join(ROOT_DIR, ".mp")
+                ebook_url = get_latest_ebook_url(mp_dir)
+                description = build_youtube_description(
+                    base_description=description,
+                    topic=self.subject,
+                    ebook_url=ebook_url,
+                    affiliate_link=affiliate_link,
+                    include_disclosure=True,
+                    is_shorts=True,
+                )
+            except Exception:
+                pass
+
+            broad_hashtags = "#Shorts #Psychology #HumanBehavior #DarkPsychology #SelfAwareness"
+            if "#Shorts" not in description and "#shorts" not in description:
+                description += f"\n\n{broad_hashtags}"
+            elif "#Psychology" not in description and "#psychology" not in description:
+                description += "\n#Psychology #HumanBehavior #DarkPsychology #SelfAwareness"
+
+            self.metadata = {"title": title, "description": description, "tags": tags}
+            return self.metadata
         title = self.generate_response(
             f"""Generate a YouTube video title for the following subject.
 Style: Jung Thoughts channel — use formats like:
@@ -337,6 +471,62 @@ Subject: {self.subject}"""
             image_prompts (List[str]): Generated List of image prompts.
         """
         n_prompts = 5
+
+        if self._is_psychology_channel():
+            prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about human psychology.
+Each image must feel emotionally intense, realistic, and symbolic of hidden motives, emotional distance, power, insecurity, overthinking, attachment, or self-deception.
+Style: hyper-realistic psychology visuals, dramatic lighting, expressive faces, tense body language, reflective mirrors, isolation, urban night scenes, subtle symbolism.
+DO NOT generate gore, monsters, or fantasy. Keep it realistic, human, and emotionally sharp.
+Return ONLY a JSON array of {n_prompts} strings, nothing else.
+
+Subject: {self.subject}"""
+
+            completion = (
+                str(self.generate_response(prompt))
+                .replace("```json", "")
+                .replace("```", "")
+                .strip()
+            )
+
+            image_prompts = []
+
+            try:
+                parsed = json.loads(completion)
+                if isinstance(parsed, list):
+                    image_prompts = [str(p) for p in parsed if p]
+                elif isinstance(parsed, dict) and "image_prompts" in parsed:
+                    image_prompts = parsed["image_prompts"]
+            except Exception:
+                r = re.compile(r"\[.*?\]", re.DOTALL)
+                match = r.search(completion)
+                if match:
+                    try:
+                        image_prompts = json.loads(match.group())
+                    except Exception:
+                        pass
+
+            if not image_prompts:
+                if _retries < 3:
+                    if get_verbose():
+                        warning("Failed to parse image prompts. Retrying...")
+                    return self.generate_prompts(_retries=_retries + 1)
+                if get_verbose():
+                    warning("Using fallback image prompts.")
+                image_prompts = [
+                    f"close-up of a person's face hiding emotion behind a calm expression, dramatic cinematic lighting, realistic human psychology theme, {self.subject}",
+                    f"person sitting alone at night overthinking text messages, city lights blurred in background, emotionally tense, realistic, {self.subject}",
+                    f"mirror reflection showing inner conflict and self-deception, cinematic realism, powerful body language, {self.subject}",
+                    f"two people standing close but emotionally distant, subtle tension, dark neutral palette, realistic relationship psychology, {self.subject}",
+                    f"extreme close-up of eyes revealing fear, desire, and insecurity, dramatic portrait photography, {self.subject}",
+                ]
+
+            image_prompts = image_prompts[:n_prompts]
+            self.image_prompts = image_prompts
+
+            if get_verbose():
+                info(f" => Generated Image Prompts: {image_prompts}")
+            success(f"Generated {len(image_prompts)} Image Prompts.")
+            return image_prompts
 
         prompt = f"""Generate exactly {n_prompts} deeply spiritual and cinematic image prompts for a YouTube Short about consciousness, reality shifting, and inner truth.
 Each image must feel like a visual gateway into a higher dimension — breathtaking, otherworldly, and deeply meaningful.
