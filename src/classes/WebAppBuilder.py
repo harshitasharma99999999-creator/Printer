@@ -31,6 +31,38 @@ class WebAppBuilder:
     def __init__(self):
         self.template_dir = os.path.join(ROOT_DIR, "webapp_template")
 
+    @staticmethod
+    def _decode_base64_secret(value: str) -> bytes:
+        raw = (value or "").strip()
+        if not raw:
+            raise ValueError("Secret is empty.")
+        remainder = len(raw) % 4
+        if remainder:
+            raw += "=" * (4 - remainder)
+        return base64.b64decode(raw)
+
+    @staticmethod
+    def _extract_json_object(text: str) -> str:
+        decoder = json.JSONDecoder()
+        for idx, char in enumerate(text):
+            if char != "{":
+                continue
+            try:
+                _, end = decoder.raw_decode(text[idx:])
+                return text[idx:idx + end]
+            except json.JSONDecodeError:
+                continue
+        raise ValueError("No valid JSON object found in model response.")
+
+    def _repair_json_response(self, bad_response: str) -> dict:
+        repair_prompt = (
+            "Repair this invalid JSON so it becomes a single valid JSON object. "
+            "Do not change the meaning. Return only valid JSON.\n\n"
+            f"{bad_response}"
+        )
+        repaired = generate_text(repair_prompt).replace("```json", "").replace("```", "").strip()
+        return json.loads(self._extract_json_object(repaired))
+
     def research_niche(self) -> list:
         posts = []
         headers = {"User-Agent": "Mozilla/5.0 (compatible; WebAppBot/1.0)"}
@@ -104,11 +136,10 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         try:
             config = json.loads(response)
         except Exception:
-            match = re.search(r"\{.*\}", response, re.DOTALL)
-            if match:
-                config = json.loads(match.group())
-            else:
-                raise ValueError(f"Could not parse LLM config: {response[:300]}")
+            try:
+                config = json.loads(self._extract_json_object(response))
+            except Exception:
+                config = self._repair_json_response(response[:8000])
 
         # Sanitize app_slug and append today's date so daily runs don't collide
         from datetime import datetime
@@ -207,9 +238,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
 
         keystore_path = os.path.join(tempfile.gettempdir(), "android_release.keystore")
         with open(keystore_path, "wb") as f:
-            # Add padding in case GitHub stripped trailing '=' from the secret
-            padded = keystore_b64 + "=" * (4 - len(keystore_b64) % 4)
-            f.write(base64.b64decode(padded))
+            f.write(self._decode_base64_secret(keystore_b64))
 
         try:
             result = subprocess.run(
@@ -337,8 +366,10 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             cwd=app_dir, capture_output=True, text=True, timeout=300,
         )
         output = result.stdout + result.stderr
-        match = re.search(r"https://[\w.-]+\.vercel\.app", output)
-        return match.group() if match else f"https://{slug}.vercel.app"
+        canonical_url = f"https://{slug}.vercel.app"
+        if result.returncode != 0 and canonical_url not in output:
+            raise RuntimeError(f"Vercel redeploy failed:\n{output[-1000:]}")
+        return canonical_url
 
     def verify_app(self, url: str, config: dict) -> dict:
         """
@@ -346,6 +377,57 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         Returns dict: { tool_ok, payment_ok, errors[] }
         """
         import time as _time
+        input_payload = {"input1": config.get("input_1_placeholder", "test"), "input2": "test"}
+        final_results = {"tool_ok": False, "payment_ok": False, "errors": []}
+
+        for attempt in range(1, 4):
+            results = {"tool_ok": False, "payment_ok": False, "errors": []}
+            if attempt > 1 and get_verbose():
+                info(f"Retrying app verification ({attempt}/3)...")
+            _time.sleep(15 if attempt == 1 else 10)
+
+            try:
+                r = requests.get(url, timeout=20)
+                if r.status_code != 200:
+                    results["errors"].append(f"Homepage returned {r.status_code}")
+            except Exception as e:
+                results["errors"].append(f"Homepage unreachable: {e}")
+
+            try:
+                r = requests.post(f"{url}/api/generate", json=input_payload, timeout=30)
+                data = r.json()
+                if r.status_code == 200 and data.get("result"):
+                    results["tool_ok"] = True
+                    if get_verbose():
+                        info(f"Verify: /api/generate OK - result: {str(data['result'])[:80]}...")
+                else:
+                    results["errors"].append(f"/api/generate failed: {r.status_code} {str(data)[:100]}")
+            except Exception as e:
+                results["errors"].append(f"/api/generate error: {e}")
+
+            try:
+                r = requests.post(
+                    f"{url}/api/checkout",
+                    json={"email": "test@test.com", "yearly": False},
+                    timeout=20,
+                )
+                data = r.json()
+                if r.status_code == 200 and data.get("url"):
+                    results["payment_ok"] = True
+                    if get_verbose():
+                        info("Verify: /api/checkout OK - payment link returned.")
+                elif "not configured" in str(data).lower() or r.status_code == 500:
+                    results["errors"].append("Payment not configured: DODO_API_KEY or DODO_PRODUCT_ID missing on Vercel.")
+                else:
+                    results["errors"].append(f"/api/checkout: {r.status_code} {str(data)[:100]}")
+            except Exception as e:
+                results["errors"].append(f"/api/checkout error: {e}")
+
+            final_results = results
+            if results["tool_ok"] and results["payment_ok"]:
+                return results
+
+        return final_results
         results = {"tool_ok": False, "payment_ok": False, "errors": []}
 
         # Wait for Vercel to propagate the new deployment
@@ -422,13 +504,12 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if get_verbose():
             print(output[-3000:])
 
-        match = re.search(r"https://[\w.-]+\.vercel\.app", output)
-        deploy_url = match.group() if match else None
+        canonical_url = f"https://{slug}.vercel.app"
 
-        if result.returncode != 0 and not deploy_url:
+        if result.returncode != 0 and canonical_url not in output:
             raise RuntimeError(f"Vercel deploy failed:\n{output[-1000:]}")
 
-        base_url = deploy_url or f"https://{slug}.vercel.app"
+        base_url = canonical_url
 
         # Set all env vars via Vercel API
         self.set_vercel_env_vars(slug, {
@@ -459,13 +540,14 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             return None
 
         twa_dir = os.path.join(tempfile.gettempdir(), f"twa-{config['app_slug']}")
+        if os.path.exists(twa_dir):
+            shutil.rmtree(twa_dir)
         os.makedirs(twa_dir, exist_ok=True)
 
         # Write keystore file
         keystore_path = os.path.join(twa_dir, "release.keystore")
         with open(keystore_path, "wb") as f:
-            padded = keystore_b64 + "=" * (4 - len(keystore_b64) % 4)
-            f.write(base64.b64decode(padded))
+            f.write(self._decode_base64_secret(keystore_b64))
 
         domain = deploy_url.replace("https://", "").replace("http://", "").rstrip("/")
         package_name = config.get("package_name", f"com.moneyprinter.{re.sub(r'[^a-z0-9]', '', config['app_slug'].lower())}")
@@ -482,6 +564,11 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                 fingerprint = m.group(1)
 
         # Build twa-manifest.json for Bubblewrap
+        from datetime import datetime
+
+        version_code = int(datetime.utcnow().strftime("%y%m%d%H%M%S"))
+        version_name = datetime.utcnow().strftime("%Y.%m.%d.%H%M%S")
+
         twa_manifest = {
             "packageId": package_name,
             "host": domain,
@@ -501,8 +588,8 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             "maskableIconUrl": f"https://{domain}/icon-512.png",
             "splashScreenFadeOutDuration": 300,
             "signingKey": {"path": keystore_path, "alias": key_alias},
-            "appVersionCode": 1,
-            "appVersion": "1.0.0",
+            "appVersionCode": version_code,
+            "appVersion": version_name,
             "shortcuts": [],
             "generatorApp": "bubblewrap-cli",
             "webManifestUrl": f"https://{domain}/manifest.json",
@@ -541,6 +628,10 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                 print(result.stdout[-2000:])
                 if result.stderr:
                     print(result.stderr[-1000:])
+            if result.returncode != 0:
+                if get_verbose():
+                    warning(f"Bubblewrap exited with code {result.returncode}.")
+                return None
         except Exception as e:
             if get_verbose():
                 warning(f"Bubblewrap build failed: {e}")
@@ -675,8 +766,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         try:
             from google.oauth2 import service_account as sa
             from googleapiclient.discovery import build as google_build
-            from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
-            import io
+            from googleapiclient.http import MediaFileUpload
 
             credentials = sa.Credentials.from_service_account_info(
                 json.loads(service_account_json),
@@ -1022,6 +1112,21 @@ What would you add or improve? Drop a comment below 👇
         if get_verbose():
             info(f"Verifying app health at {url}...")
         check = self.verify_app(url, config)
+        if check["errors"]:
+            for e in check["errors"]:
+                warning(f"App check: {e}")
+
+        if not check["tool_ok"]:
+            raise RuntimeError(
+                "ABORT: /api/generate is broken - AI tool not working. "
+                "Check GEMINI_API_KEY on Vercel and deployment accessibility."
+            )
+
+        if not check["payment_ok"]:
+            raise RuntimeError(
+                "ABORT: payment check failed - DODO_API_KEY or DODO_PRODUCT_ID is missing or broken. "
+                "Skipping Play Store until checkout works."
+            )
 
         if check["errors"]:
             for e in check["errors"]:
@@ -1050,8 +1155,12 @@ What would you add or improve? Drop a comment below 👇
         # Build Android TWA and publish to Play Store
         if os.environ.get("ANDROID_KEYSTORE_BASE64") and os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON"):
             aab_path = self.build_twa(app_dir, config, url)
+            if not aab_path:
+                raise RuntimeError("Android TWA build failed; no AAB produced.")
             if aab_path:
-                self.publish_to_play_store(aab_path, config, deploy_url=url)
+                published = self.publish_to_play_store(aab_path, config, deploy_url=url)
+                if not published:
+                    raise RuntimeError("Play Store publish failed after AAB build.")
                 # Submit to Testers Community for 14-day testing
                 play_store_url = f"https://play.google.com/store/apps/details?id={config.get('package_name', '')}"
                 self.submit_to_testers_community(config, play_store_url)
