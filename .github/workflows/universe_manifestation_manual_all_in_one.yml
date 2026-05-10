@@ -127,15 +127,6 @@ jobs:
           INSTAGRAM_VIDEO_PATH: ".mp/last_short.mp4"
         run: python src/instagram_runner.py
 
-      - name: Upload to X/Twitter
-        env:
-          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
-          TWITTER_VIDEO_PATH: ".mp/last_short.mp4"
-        run: python src/twitter_runner.py
-
       - name: Upload debug artifacts (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -253,15 +244,6 @@ jobs:
           INSTAGRAM_SESSION_JSON: ${{ secrets.INSTAGRAM_SESSION_JSON }}
           INSTAGRAM_VIDEO_PATH: ".mp/last_short.mp4"
         run: python src/instagram_runner.py
-
-      - name: Upload to X/Twitter
-        env:
-          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
-          TWITTER_VIDEO_PATH: ".mp/last_short.mp4"
-        run: python src/twitter_runner.py
 
       - name: Upload debug artifacts (on failure)
         if: failure()
