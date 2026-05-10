@@ -22,6 +22,21 @@ SHORTS_NICHES = [
     "spiritual awakening",
 ]
 
+
+def _resolve_shorts_niche(account: dict) -> str:
+    env_niche = (
+        os.environ.get("SHORTS_NICHE", "").strip()
+        or os.environ.get("CONTENT_TOPIC", "").strip()
+    )
+    if env_niche:
+        return env_niche
+
+    account_niche = str(account.get("niche", "") or "").strip()
+    if account_niche:
+        return account_niche
+
+    return random.choice(SHORTS_NICHES)
+
 def _use_groq() -> bool:
     return bool(os.environ.get("GROQ_API_KEY") or get_groq_api_key())
 
@@ -136,9 +151,9 @@ def main() -> None:
                 except Exception as exc:
                     error(str(exc))
                     sys.exit(2)
-                niche = random.choice(SHORTS_NICHES)
+                niche = _resolve_shorts_niche(acc)
                 if verbose:
-                    info(f"Random niche selected: {niche}")
+                    info(f"Shorts niche selected: {niche}")
                 youtube = YouTube(
                     acc["id"],
                     acc["nickname"],
