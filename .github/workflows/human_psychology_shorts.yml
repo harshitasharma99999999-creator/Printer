@@ -1,4 +1,4 @@
-name: Human Psychology - YouTube Shorts
+name: Human Psychology - Shorts + Instagram
 
 on:
   schedule:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   shorts:
-    name: YouTube Shorts
+    name: Shorts + Instagram
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -101,6 +101,15 @@ jobs:
           SHORTS_NICHE: "real human psychology dark truth about people human behavior emotional patterns hidden motives self deception relationships power insecurity body language"
           YOUTUBE_AUTO_EBOOK: "false"
         run: python src/cron.py youtube human-psychology-channel
+
+      - name: Upload to Instagram Reels
+        env:
+          INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD }}
+          INSTAGRAM_SESSION_JSON: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_SESSION_JSON }}
+          INSTAGRAM_VIDEO_PATH: ".mp/last_short.mp4"
+          INSTAGRAM_HASHTAGS: "#humanpsychology #psychologyfacts #darkpsychology #psychology #humanbehavior #bodylanguage #mindset #relationships #selfawareness #reels"
+        run: python src/instagram_runner.py
 
       - name: Upload debug artifacts (on failure)
         if: failure()

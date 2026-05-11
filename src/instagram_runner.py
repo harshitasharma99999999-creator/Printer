@@ -61,6 +61,7 @@ def main():
 
     # Allow workflow to override caption (e.g. AFM uses a product-specific caption)
     caption_override = os.environ.get("INSTAGRAM_CAPTION", "").strip()
+    hashtags_override = os.environ.get("INSTAGRAM_HASHTAGS", "").strip()
     if caption_override:
         caption = caption_override
 
@@ -73,7 +74,13 @@ def main():
                 _aff_link = _f.read().strip()
         except Exception:
             pass
-    if not caption_override:
+    if not caption_override and hashtags_override:
+        caption = hashtags_override
+        if subject:
+            caption = f"{subject}\n\n{hashtags_override}"
+        if _aff_link:
+            caption += f"\n\nLink: {_aff_link}"
+    elif not caption_override:
         try:
             from marketing import build_instagram_caption, get_latest_ebook_url
 
