@@ -690,6 +690,11 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         keystore_password = os.environ.get("ANDROID_KEYSTORE_PASSWORD", "").strip()
         key_alias = os.environ.get("ANDROID_KEY_ALIAS", "appkey").strip()
         key_password = os.environ.get("ANDROID_KEY_PASSWORD", keystore_password).strip()
+        java_home = os.environ.get("JAVA_HOME", "").strip()
+        android_home = (
+            os.environ.get("ANDROID_HOME", "").strip()
+            or os.environ.get("ANDROID_SDK_ROOT", "").strip()
+        )
 
         if not keystore_b64 or not keystore_password:
             if get_verbose():
@@ -705,6 +710,31 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         keystore_path = os.path.join(twa_dir, "release.keystore")
         with open(keystore_path, "wb") as f:
             f.write(self._decode_base64_secret(keystore_b64))
+
+        try:
+            keystore_check = subprocess.run(
+                [
+                    "keytool", "-list", "-v",
+                    "-keystore", keystore_path,
+                    "-alias", key_alias,
+                    "-storepass", keystore_password,
+                    "-noprompt",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if keystore_check.returncode != 0:
+                if get_verbose():
+                    warning(
+                        "Android keystore could not be read. "
+                        f"keytool output: {(keystore_check.stdout + keystore_check.stderr)[:500]}"
+                    )
+                return None
+        except Exception as e:
+            if get_verbose():
+                warning(f"Android keystore validation failed: {e}")
+            return None
 
         domain = deploy_url.replace("https://", "").replace("http://", "").rstrip("/")
         package_name = config.get("package_name", f"com.moneyprinter.{re.sub(r'[^a-z0-9]', '', config['app_slug'].lower())}")
@@ -768,18 +798,56 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if get_verbose():
             info(f"Running bubblewrap build in {twa_dir}...")
 
+        bubblewrap_home = os.path.join(twa_dir, ".bubblewrap-home")
+        os.makedirs(os.path.join(bubblewrap_home, ".bubblewrap"), exist_ok=True)
+        bubblewrap_config_path = os.path.join(bubblewrap_home, ".bubblewrap", "config.json")
+        with open(bubblewrap_config_path, "w") as f:
+            json.dump(
+                {
+                    "jdkPath": java_home,
+                    "androidSdkPath": android_home,
+                },
+                f,
+            )
+
+        bubblewrap_env = {
+            **os.environ,
+            "HOME": bubblewrap_home,
+            "CI": "true",
+            "KEYSTORE_PASSWORD": keystore_password,
+            "KEY_PASSWORD": key_password,
+        }
+
+        if java_home:
+            bubblewrap_env["JAVA_HOME"] = java_home
+        if android_home:
+            bubblewrap_env["ANDROID_HOME"] = android_home
+            bubblewrap_env["ANDROID_SDK_ROOT"] = android_home
+
         try:
+            if java_home or android_home:
+                update_config_cmd = ["bubblewrap", "updateConfig"]
+                if java_home:
+                    update_config_cmd.append(f"--jdkPath={java_home}")
+                if android_home:
+                    update_config_cmd.append(f"--androidSdkPath={android_home}")
+                subprocess.run(
+                    update_config_cmd,
+                    cwd=twa_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    env=bubblewrap_env,
+                    check=False,
+                )
+
             result = subprocess.run(
                 ["bubblewrap", "build", "--skipPwaValidation"],
                 cwd=twa_dir,
                 capture_output=True,
                 text=True,
                 timeout=600,
-                env={
-                    **os.environ,
-                    "KEYSTORE_PASSWORD": keystore_password,
-                    "KEY_PASSWORD": key_password,
-                },
+                env=bubblewrap_env,
             )
             if get_verbose():
                 print(result.stdout[-2000:])
