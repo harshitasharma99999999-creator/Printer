@@ -366,36 +366,16 @@ Subject: {self.subject}"""
                     tags.append(tag)
             tags = tags[:15]
 
-            affiliate_link = self._get_product_affiliate_link()
-            if affiliate_link:
-                description += f"\n\nRecommended -> {affiliate_link}"
-                try:
-                    with open(os.path.join(ROOT_DIR, ".mp", "affiliate_link.txt"), "w") as _f:
-                        _f.write(affiliate_link)
-                except Exception:
-                    pass
+            subject_line = self._sanitize_youtube_text(self.subject, limit=120, multiline=False)
+            summary_line = self._sanitize_youtube_text(description, limit=220, multiline=False)
+            if not summary_line:
+                summary_line = "Dark truths about human behavior, emotional patterns, and self-awareness."
 
-            try:
-                from marketing import build_youtube_description, get_latest_ebook_url
-
-                mp_dir = os.path.join(ROOT_DIR, ".mp")
-                ebook_url = get_latest_ebook_url(mp_dir)
-                description = build_youtube_description(
-                    base_description=description,
-                    topic=self.subject,
-                    ebook_url=ebook_url,
-                    affiliate_link=affiliate_link,
-                    include_disclosure=True,
-                    is_shorts=True,
-                )
-            except Exception:
-                pass
-
-            broad_hashtags = "#Shorts #Psychology #HumanBehavior #DarkPsychology #SelfAwareness"
-            if "#Shorts" not in description and "#shorts" not in description:
-                description += f"\n\n{broad_hashtags}"
-            elif "#Psychology" not in description and "#psychology" not in description:
-                description += "\n#Psychology #HumanBehavior #DarkPsychology #SelfAwareness"
+            description = (
+                f"{subject_line}\n\n"
+                f"{summary_line}\n\n"
+                "#Shorts #Psychology #HumanBehavior #DarkPsychology #SelfAwareness"
+            )
 
             self.metadata = {"title": title, "description": description, "tags": tags}
             return self.metadata
