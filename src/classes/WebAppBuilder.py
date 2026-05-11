@@ -80,6 +80,16 @@ class WebAppBuilder:
         except ValueError:
             return response.text[:300]
 
+    def _capture_vercel_urls(self, output: str, slug: str) -> tuple[str, str]:
+        canonical_url = f"https://{slug}.vercel.app"
+        direct_match = re.search(r"Production:\s+(https://[^\s]+)", output)
+        alias_match = re.search(r"Aliased:\s+(https://[^\s]+)", output)
+        direct_url = direct_match.group(1) if direct_match else canonical_url
+        alias_url = alias_match.group(1) if alias_match else canonical_url
+        self._latest_deploy_url = direct_url
+        self._latest_alias_url = alias_url
+        return direct_url, alias_url
+
     def research_niche(self) -> list:
         posts = []
         headers = {"User-Agent": "Mozilla/5.0 (compatible; WebAppBot/1.0)"}
@@ -411,6 +421,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         )
         output = result.stdout + result.stderr
         canonical_url = f"https://{slug}.vercel.app"
+        self._capture_vercel_urls(output, slug)
         if result.returncode != 0 and canonical_url not in output:
             raise RuntimeError(f"Vercel redeploy failed:\n{output[-1000:]}")
         return canonical_url
@@ -423,6 +434,94 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         import time as _time
         input_payload = {"input1": config.get("input_1_placeholder", "test"), "input2": "test"}
         final_results = {"tool_ok": False, "payment_ok": False, "errors": []}
+
+        verify_urls = []
+        for candidate in [
+            getattr(self, "_latest_deploy_url", ""),
+            getattr(self, "_latest_alias_url", ""),
+            url,
+        ]:
+            candidate = (candidate or "").rstrip("/")
+            if candidate and candidate not in verify_urls:
+                verify_urls.append(candidate)
+
+        for attempt in range(1, 5):
+            results = {"tool_ok": False, "payment_ok": False, "errors": []}
+            if attempt > 1 and get_verbose():
+                info(f"Retrying app verification ({attempt}/4)...")
+            _time.sleep(20 if attempt == 1 else 15)
+
+            for verify_url in verify_urls:
+                env_flags = {}
+                try:
+                    r = requests.get(verify_url, timeout=20)
+                    if r.status_code != 200:
+                        results["errors"].append(f"{verify_url}: homepage returned {r.status_code}")
+                except Exception as e:
+                    results["errors"].append(f"{verify_url}: homepage unreachable: {e}")
+                    continue
+
+                try:
+                    r = requests.get(f"{verify_url}/api/health", timeout=20)
+                    data = self._response_payload(r)
+                    if r.status_code == 200 and isinstance(data, dict):
+                        env_flags = data.get("env", {}) or {}
+                        if get_verbose():
+                            info(
+                                f"Verify: /api/health on {verify_url} - "
+                                f"gemini={env_flags.get('geminiConfigured')} "
+                                f"dodo={env_flags.get('dodoConfigured')}"
+                            )
+                    else:
+                        results["errors"].append(f"{verify_url}/api/health failed: {r.status_code} {str(data)[:100]}")
+                except Exception as e:
+                    results["errors"].append(f"{verify_url}/api/health error: {e}")
+
+                try:
+                    r = requests.post(f"{verify_url}/api/generate", json=input_payload, timeout=30)
+                    data = self._response_payload(r)
+                    if r.status_code == 200 and isinstance(data, dict) and data.get("result"):
+                        results["tool_ok"] = True
+                        if get_verbose():
+                            info(f"Verify: /api/generate OK on {verify_url} - result: {str(data['result'])[:80]}...")
+                    else:
+                        results["errors"].append(f"{verify_url}/api/generate failed: {r.status_code} {str(data)[:100]}")
+                except Exception as e:
+                    results["errors"].append(f"{verify_url}/api/generate error: {e}")
+
+                try:
+                    r = requests.post(
+                        f"{verify_url}/api/checkout",
+                        json={"email": "test@test.com", "yearly": False},
+                        timeout=20,
+                    )
+                    data = self._response_payload(r)
+                    if r.status_code == 200 and isinstance(data, dict) and data.get("url"):
+                        results["payment_ok"] = True
+                        if get_verbose():
+                            info(f"Verify: /api/checkout OK on {verify_url} - payment link returned.")
+                    elif env_flags.get("dodoConfigured") is False:
+                        results["errors"].append(
+                            f"{verify_url}: payment env missing in runtime "
+                            "(DODO_API_KEY or DODO_PRODUCT_ID not visible)."
+                        )
+                    elif isinstance(data, dict) and data.get("error") == "Payment creation failed":
+                        results["errors"].append(f"{verify_url}: Dodo API rejected payment creation.")
+                    elif "not configured" in str(data).lower() or r.status_code == 500:
+                        results["errors"].append(f"{verify_url}: payment not configured yet.")
+                    else:
+                        results["errors"].append(f"{verify_url}/api/checkout: {r.status_code} {str(data)[:100]}")
+                except Exception as e:
+                    results["errors"].append(f"{verify_url}/api/checkout error: {e}")
+
+                if results["tool_ok"] and results["payment_ok"]:
+                    return results
+
+            final_results = results
+            if results["tool_ok"] and results["payment_ok"]:
+                return results
+
+        return final_results
 
         for attempt in range(1, 4):
             results = {"tool_ok": False, "payment_ok": False, "errors": []}
@@ -558,6 +657,7 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if get_verbose():
             print(output[-3000:])
 
+        self._capture_vercel_urls(output, slug)
         if result.returncode != 0 and canonical_url not in output:
             raise RuntimeError(f"Vercel deploy failed:\n{output[-1000:]}")
 
