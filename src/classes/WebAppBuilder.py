@@ -506,9 +506,19 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                             "(DODO_API_KEY or DODO_PRODUCT_ID not visible)."
                         )
                     elif isinstance(data, dict) and data.get("error") == "Payment creation failed":
-                        results["errors"].append(f"{verify_url}: Dodo API rejected payment creation.")
-                    elif "not configured" in str(data).lower() or r.status_code == 500:
+                        detail = str(data.get("detail", ""))[:180]
+                        if detail:
+                            results["errors"].append(
+                                f"{verify_url}: Dodo API rejected payment creation. {detail}"
+                            )
+                        else:
+                            results["errors"].append(f"{verify_url}: Dodo API rejected payment creation.")
+                    elif "not configured" in str(data).lower():
                         results["errors"].append(f"{verify_url}: payment not configured yet.")
+                    elif r.status_code == 500 and env_flags.get("dodoConfigured") is True:
+                        results["errors"].append(f"{verify_url}: checkout route failed despite Dodo env being present.")
+                    elif r.status_code == 500:
+                        results["errors"].append(f"{verify_url}: payment route returned 500.")
                     else:
                         results["errors"].append(f"{verify_url}/api/checkout: {r.status_code} {str(data)[:100]}")
                 except Exception as e:
