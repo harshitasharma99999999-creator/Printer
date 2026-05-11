@@ -63,6 +63,23 @@ class WebAppBuilder:
         repaired = generate_text(repair_prompt).replace("```json", "").replace("```", "").strip()
         return json.loads(self._extract_json_object(repaired))
 
+    @staticmethod
+    def _build_vercel_env_args(env_vars: dict) -> list[str]:
+        args = []
+        for key, value in env_vars.items():
+            if not value:
+                continue
+            pair = f"{key}={value}"
+            args.extend(["--env", pair, "--build-env", pair])
+        return args
+
+    @staticmethod
+    def _response_payload(response: requests.Response):
+        try:
+            return response.json()
+        except ValueError:
+            return response.text[:300]
+
     def research_niche(self) -> list:
         posts = []
         headers = {"User-Agent": "Mozilla/5.0 (compatible; WebAppBot/1.0)"}
@@ -335,10 +352,34 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if not token:
             return
 
+        existing_envs = []
+        try:
+            existing = requests.get(
+                f"https://api.vercel.com/v9/projects/{project_slug}/env",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=15,
+            )
+            if existing.ok:
+                existing_envs = existing.json().get("envs", [])
+        except Exception as e:
+            if get_verbose():
+                warning(f"Failed to list Vercel env vars for {project_slug}: {e}")
+
         for key, value in env_vars.items():
             if not value:
                 continue
             try:
+                for env in existing_envs:
+                    if env.get("key") != key:
+                        continue
+                    env_id = env.get("id")
+                    if not env_id:
+                        continue
+                    requests.delete(
+                        f"https://api.vercel.com/v9/projects/{project_slug}/env/{env_id}",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=15,
+                    )
                 r = requests.post(
                     f"https://api.vercel.com/v10/projects/{project_slug}/env",
                     headers={
@@ -358,11 +399,14 @@ Return ONLY a valid JSON object, no markdown, no explanation:
             except Exception as e:
                 warning(f"Failed to set Vercel env {key}: {e}")
 
-    def _redeploy(self, app_dir: str, config: dict, vercel_token: str) -> str:
+    def _redeploy(self, app_dir: str, config: dict, vercel_token: str, env_vars: dict | None = None) -> str:
         """Trigger a fresh Vercel deploy and return the URL."""
         slug = config["app_slug"]
+        cmd = ["vercel", "--token", vercel_token, "--yes", "--prod", "--name", slug]
+        if env_vars:
+            cmd.extend(self._build_vercel_env_args(env_vars))
         result = subprocess.run(
-            ["vercel", "--token", vercel_token, "--yes", "--prod", "--name", slug],
+            cmd,
             cwd=app_dir, capture_output=True, text=True, timeout=300,
         )
         output = result.stdout + result.stderr
@@ -395,8 +439,8 @@ Return ONLY a valid JSON object, no markdown, no explanation:
 
             try:
                 r = requests.post(f"{url}/api/generate", json=input_payload, timeout=30)
-                data = r.json()
-                if r.status_code == 200 and data.get("result"):
+                data = self._response_payload(r)
+                if r.status_code == 200 and isinstance(data, dict) and data.get("result"):
                     results["tool_ok"] = True
                     if get_verbose():
                         info(f"Verify: /api/generate OK - result: {str(data['result'])[:80]}...")
@@ -411,8 +455,8 @@ Return ONLY a valid JSON object, no markdown, no explanation:
                     json={"email": "test@test.com", "yearly": False},
                     timeout=20,
                 )
-                data = r.json()
-                if r.status_code == 200 and data.get("url"):
+                data = self._response_payload(r)
+                if r.status_code == 200 and isinstance(data, dict) and data.get("url"):
                     results["payment_ok"] = True
                     if get_verbose():
                         info("Verify: /api/checkout OK - payment link returned.")
@@ -495,8 +539,18 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if get_verbose():
             info(f"Deploying {config['app_name']} to Vercel (pass 1 — build)...")
 
+        canonical_url = f"https://{slug}.vercel.app"
+        deployment_envs = {
+            "DODO_API_KEY": dodo_api_key,
+            "DODO_PRODUCT_ID": dodo_product_id,
+            "NEXT_PUBLIC_BASE_URL": canonical_url,
+            "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY", ""),
+        }
+        cmd = ["vercel", "--token", vercel_token, "--yes", "--prod", "--name", slug]
+        cmd.extend(self._build_vercel_env_args(deployment_envs))
+
         result = subprocess.run(
-            ["vercel", "--token", vercel_token, "--yes", "--prod", "--name", slug],
+            cmd,
             cwd=app_dir, capture_output=True, text=True, timeout=300,
         )
 
@@ -504,25 +558,18 @@ Return ONLY a valid JSON object, no markdown, no explanation:
         if get_verbose():
             print(output[-3000:])
 
-        canonical_url = f"https://{slug}.vercel.app"
-
         if result.returncode != 0 and canonical_url not in output:
             raise RuntimeError(f"Vercel deploy failed:\n{output[-1000:]}")
 
         base_url = canonical_url
 
-        # Set all env vars via Vercel API
-        self.set_vercel_env_vars(slug, {
-            "DODO_API_KEY": dodo_api_key,
-            "DODO_PRODUCT_ID": dodo_product_id,
-            "NEXT_PUBLIC_BASE_URL": base_url,
-            "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY", ""),
-        })
+        # Best-effort sync to project-level env so future manual redeploys keep working.
+        self.set_vercel_env_vars(slug, deployment_envs)
 
         # Redeploy so the env vars take effect in the running build
         if get_verbose():
             info("Redeploying with env vars applied (pass 2)...")
-        base_url = self._redeploy(app_dir, config, vercel_token)
+        base_url = self._redeploy(app_dir, config, vercel_token, deployment_envs)
 
         success(f"Deployed to {base_url}")
         return base_url

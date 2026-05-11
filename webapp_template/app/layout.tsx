@@ -5,8 +5,11 @@ export const metadata: Metadata = {
   title: "__APP_NAME__",
   description: "__TAGLINE__",
   manifest: "/manifest.json",
-  themeColor: "#7c3aed",
   icons: { apple: "/icon-192.png" },
+};
+
+export const viewport = {
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
