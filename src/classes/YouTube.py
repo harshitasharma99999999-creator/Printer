@@ -263,6 +263,10 @@ Subject: {self.subject}"""
         if not keywords:
             return base  # fallback to static config link
 
+        keywords = re.sub(r"[\r\n\t]+", " ", keywords)
+        keywords = re.sub(r"^\s*[-*]+\s*", "", keywords)
+        keywords = re.sub(r"\s{2,}", " ", keywords).strip()
+
         encoded = _qp(keywords)
         search_url = f"https://www.amazon.in/s?k={encoded}&tag={tag}"
 
@@ -292,6 +296,22 @@ Subject: {self.subject}"""
         if get_verbose():
             info(f"Affiliate search link: {search_url}")
         return search_url
+
+    @staticmethod
+    def _sanitize_youtube_text(text: str, *, limit: int, multiline: bool = False) -> str:
+        if not text:
+            return ""
+
+        cleaned = str(text).replace("\r\n", "\n").replace("\r", "\n")
+        cleaned = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", cleaned)
+
+        if multiline:
+            cleaned = "\n".join(line.strip() for line in cleaned.split("\n"))
+            cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        else:
+            cleaned = re.sub(r"\s+", " ", cleaned)
+
+        return cleaned.strip()[:limit]
 
     def generate_metadata(self) -> dict:
         """
@@ -1190,11 +1210,21 @@ Subject: {self.subject}"""
             creds = self._get_yt_credentials()
             youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
             verbose = get_verbose()
+            title = self._sanitize_youtube_text(
+                self.metadata.get("title", self.subject),
+                limit=100,
+                multiline=False,
+            )
+            description = self._sanitize_youtube_text(
+                self.metadata.get("description", ""),
+                limit=5000,
+                multiline=True,
+            )
 
             body = {
                 "snippet": {
-                    "title": self.metadata.get("title", self.subject)[:100],
-                    "description": self.metadata.get("description", "")[:5000],
+                    "title": title,
+                    "description": description,
                     "tags": self.metadata.get("tags", []),
                     "categoryId": "22",
                 },
@@ -1225,8 +1255,8 @@ Subject: {self.subject}"""
             self.add_video(
                 {
                     "subject": self.subject,
-                    "title": self.metadata["title"],
-                    "description": self.metadata["description"],
+                    "title": title,
+                    "description": description,
                     "url": url,
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 }
