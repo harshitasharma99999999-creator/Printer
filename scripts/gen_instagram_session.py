@@ -12,8 +12,14 @@ def main():
     except ImportError:
         print("Run: pip install instagrapi"); sys.exit(1)
 
-    username = input("Instagram username: ").strip()
-    password = input("Instagram password: ").strip()
+    username = os.environ.get("INSTAGRAM_USERNAME", "").strip()
+    password = os.environ.get("INSTAGRAM_PASSWORD", "").strip()
+    secret_name = os.environ.get("INSTAGRAM_SECRET_NAME", "INSTAGRAM_SESSION_JSON").strip() or "INSTAGRAM_SESSION_JSON"
+
+    if not username:
+        username = input("Instagram username: ").strip()
+    if not password:
+        password = input("Instagram password: ").strip()
 
     cl = Client()
     cl.delay_range = [1, 3]
@@ -62,6 +68,11 @@ def main():
     print(session_json)
     print("="*60)
     print(f"\nSaved to: session_{username}.json")
+    print("\nGitHub secret command:")
+    print(
+        f'Get-Content session_{username}.json -Raw | & "C:\\Program Files\\GitHub CLI\\gh.exe" '
+        f"secret set {secret_name}"
+    )
 
 if __name__ == "__main__":
     main()
