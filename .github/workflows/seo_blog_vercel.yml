@@ -7,6 +7,10 @@ on:
       - "blog_site/**"
       - "content/ai-crypto/**"
       - ".github/workflows/seo_blog_vercel.yml"
+      - "src/blog_twitter_runner.py"
+  workflow_run:
+    workflows: ["AI Crypto Blog - Daily"]
+    types: [completed]
   workflow_dispatch: {}
 
 env:
@@ -18,10 +22,13 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -34,21 +41,22 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Pull Vercel environment
+      - name: Link Vercel project
         working-directory: blog_site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.BLOG_VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.BLOG_VERCEL_PROJECT_ID }}
-        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json << 'EOF'
+          {"projectId":"prj_KXQtpFCvHIVVhYVN7dVHblTgDmHv","orgId":"team_GPxFpoBiviIB6Di14KN8N4oB","projectName":"blog_site"}
+          EOF
+          vercel pull --yes --environment=production --token=$VERCEL_TOKEN
 
       - name: Build SEO blog
         working-directory: blog_site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.BLOG_VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.BLOG_VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.BLOG_SITE_URL }}
+          NEXT_PUBLIC_SITE_URL: https://blogsite-hazel-one.vercel.app
           NEXT_PUBLIC_ADSENSE_CLIENT: ${{ secrets.NEXT_PUBLIC_ADSENSE_CLIENT }}
           NEXT_PUBLIC_ADSENSE_SLOT_IN_ARTICLE: ${{ secrets.NEXT_PUBLIC_ADSENSE_SLOT_IN_ARTICLE }}
           NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR: ${{ secrets.NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR }}
@@ -58,6 +66,14 @@ jobs:
         working-directory: blog_site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.BLOG_VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.BLOG_VERCEL_PROJECT_ID }}
         run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+      - name: Post latest article to X
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+          BLOG_SITE_URL: https://blogsite-hazel-one.vercel.app
+          BLOG_CONTENT_DIR: content/ai-crypto
+        run: python src/blog_twitter_runner.py
