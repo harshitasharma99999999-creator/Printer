@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import json
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -69,6 +70,20 @@ def build_summary(topic: str) -> str:
     return summary or topic
 
 
+def build_meta_description(topic: str) -> str:
+    prompt = (
+        f"Write one strong SEO meta description for this article title: {topic}\n"
+        "Rules:\n"
+        "- 140 to 160 characters\n"
+        "- clear, compelling, natural\n"
+        "- include AI and crypto intent when relevant\n"
+        "- no hashtags\n"
+        "- return only the description"
+    )
+    meta = generate_text(prompt).strip().replace("\n", " ")
+    return meta[:160].strip() or topic
+
+
 def build_tags(topic: str) -> list[str]:
     prompt = (
         f"Return 4 short lowercase tags for a blog post about: {topic}\n"
@@ -82,6 +97,27 @@ def build_tags(topic: str) -> list[str]:
         if tag and tag not in tags:
             tags.append(tag)
     return tags[:4] or ["ai", "crypto", "blockchain", "web3"]
+
+
+def build_faq(topic: str) -> list[dict]:
+    prompt = (
+        f"Create 4 concise FAQ pairs for an SEO article titled: {topic}\n"
+        "Return ONLY valid JSON in this exact shape:\n"
+        '[{"question":"...","answer":"..."},{"question":"...","answer":"..."}]\n'
+        "Keep answers practical and 1-3 sentences each."
+    )
+    try:
+        raw = generate_text(prompt).strip()
+        data = json.loads(raw)
+        out = []
+        for item in data:
+            question = str(item.get("question", "")).strip()
+            answer = str(item.get("answer", "")).strip()
+            if question and answer:
+                out.append({"question": question, "answer": answer})
+        return out[:4]
+    except Exception:
+        return []
 
 
 def to_html(topic: str, article_markdown: str) -> str:
@@ -106,7 +142,14 @@ def to_html(topic: str, article_markdown: str) -> str:
     return body
 
 
-def save_outputs(topic: str, summary: str, tags: list[str], article_markdown: str) -> dict:
+def save_outputs(
+    topic: str,
+    summary: str,
+    meta_description: str,
+    tags: list[str],
+    faq: list[dict],
+    article_markdown: str,
+) -> dict:
     mp_dir = os.path.join(ROOT_DIR, ".mp")
     os.makedirs(mp_dir, exist_ok=True)
 
@@ -114,8 +157,10 @@ def save_outputs(topic: str, summary: str, tags: list[str], article_markdown: st
     slug = _slugify(topic)
     md_path = os.path.join(mp_dir, f"{stamp}_{slug}.md")
     meta_path = os.path.join(mp_dir, f"{stamp}_{slug}.txt")
+    json_path = os.path.join(mp_dir, f"{stamp}_{slug}.json")
     latest_md = os.path.join(mp_dir, "last_ai_crypto_blog.md")
     latest_meta = os.path.join(mp_dir, "last_ai_crypto_blog.txt")
+    latest_json = os.path.join(mp_dir, "last_ai_crypto_blog.json")
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(article_markdown)
@@ -125,6 +170,7 @@ def save_outputs(topic: str, summary: str, tags: list[str], article_markdown: st
     meta = [
         f"Title: {topic}",
         f"Summary: {summary}",
+        f"Meta Description: {meta_description}",
         f"Tags: {', '.join(tags)}",
         f"Generated UTC: {datetime.now(timezone.utc).isoformat()}",
     ]
@@ -134,15 +180,36 @@ def save_outputs(topic: str, summary: str, tags: list[str], article_markdown: st
     with open(latest_meta, "w", encoding="utf-8") as f:
         f.write(meta_text)
 
+    payload = {
+        "title": topic,
+        "slug": slug,
+        "summary": summary,
+        "meta_description": meta_description,
+        "tags": tags,
+        "faq": faq,
+        "article_markdown": article_markdown,
+        "generated_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    with open(latest_json, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
     return {
         "markdown": md_path,
         "meta": meta_path,
+        "json": json_path,
     }
 
 
-def publish(topic: str, summary: str, tags: list[str], article_markdown: str) -> dict:
+def publish(topic: str, summary: str, tags: list[str], faq: list[dict], article_markdown: str) -> dict:
     html = to_html(topic, article_markdown)
-    markdown = f"{summary}\n\n{article_markdown}".strip()
+    faq_markdown = ""
+    if faq:
+        faq_markdown = "\n\n## FAQ\n\n" + "\n\n".join(
+            f"### {item['question']}\n{item['answer']}" for item in faq
+        )
+    markdown = f"{summary}\n\n{article_markdown}{faq_markdown}".strip()
 
     results = {"devto": "", "medium": "", "hashnode": ""}
 
@@ -178,15 +245,18 @@ def main() -> None:
 
     topic = pick_topic()
     summary = build_summary(topic)
+    meta_description = build_meta_description(topic)
     tags = build_tags(topic)
+    faq = build_faq(topic)
     article_markdown = build_article(topic)
 
-    saved = save_outputs(topic, summary, tags, article_markdown)
-    results = publish(topic, summary, tags, article_markdown)
+    saved = save_outputs(topic, summary, meta_description, tags, faq, article_markdown)
+    results = publish(topic, summary, tags, faq, article_markdown)
 
     if get_verbose():
         info(f"Topic: {topic}")
         info(f"Saved markdown: {saved['markdown']}")
+        info(f"Saved json: {saved['json']}")
         info(f"Tags: {', '.join(tags)}")
 
     published_count = sum(1 for url in results.values() if url)
