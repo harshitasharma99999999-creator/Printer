@@ -5,6 +5,9 @@ on:
     - cron: "30 4 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -80,7 +83,17 @@ jobs:
           HASHNODE_ACCESS_TOKEN: ${{ secrets.HASHNODE_ACCESS_TOKEN }}
           HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
           BLOG_NICHE: "artificial intelligence crypto blockchain web3 bitcoin ethereum ai agents onchain analytics defi crypto trading automation market structure"
+          BLOG_CONTENT_DIR: "content/ai-crypto"
         run: python src/ai_crypto_blog_runner.py
+
+      - name: Commit generated blog content
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/ai-crypto
+          git diff --cached --quiet && exit 0
+          git commit -m "Publish daily AI crypto blog content"
+          git push
 
       - name: Upload generated article artifacts
         if: always()
@@ -90,6 +103,8 @@ jobs:
           path: |
             .mp/last_ai_crypto_blog.md
             .mp/last_ai_crypto_blog.txt
+            .mp/last_ai_crypto_blog.json
             .mp/*ai-crypto-blog*.md
             .mp/*ai-crypto-blog*.txt
+            .mp/*ai-crypto-blog*.json
           if-no-files-found: ignore

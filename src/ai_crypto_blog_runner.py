@@ -26,6 +26,11 @@ def _slugify(value: str) -> str:
     return slug or "ai-crypto-blog"
 
 
+def _content_dir() -> str:
+    configured = os.environ.get("BLOG_CONTENT_DIR", "content/ai-crypto").strip()
+    return os.path.join(ROOT_DIR, configured)
+
+
 def pick_topic() -> str:
     prompt = (
         f"Generate ONE timely-feeling evergreen blog topic in this niche: {NICHE}\n"
@@ -151,9 +156,12 @@ def save_outputs(
     article_markdown: str,
 ) -> dict:
     mp_dir = os.path.join(ROOT_DIR, ".mp")
+    content_dir = _content_dir()
     os.makedirs(mp_dir, exist_ok=True)
+    os.makedirs(content_dir, exist_ok=True)
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    publish_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     slug = _slugify(topic)
     md_path = os.path.join(mp_dir, f"{stamp}_{slug}.md")
     meta_path = os.path.join(mp_dir, f"{stamp}_{slug}.txt")
@@ -161,10 +169,14 @@ def save_outputs(
     latest_md = os.path.join(mp_dir, "last_ai_crypto_blog.md")
     latest_meta = os.path.join(mp_dir, "last_ai_crypto_blog.txt")
     latest_json = os.path.join(mp_dir, "last_ai_crypto_blog.json")
+    repo_md_path = os.path.join(content_dir, f"{publish_date}-{slug}.md")
+    repo_json_path = os.path.join(content_dir, f"{publish_date}-{slug}.json")
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(article_markdown)
     with open(latest_md, "w", encoding="utf-8") as f:
+        f.write(article_markdown)
+    with open(repo_md_path, "w", encoding="utf-8") as f:
         f.write(article_markdown)
 
     meta = [
@@ -189,16 +201,21 @@ def save_outputs(
         "faq": faq,
         "article_markdown": article_markdown,
         "generated_utc": datetime.now(timezone.utc).isoformat(),
+        "published_at": datetime.now(timezone.utc).isoformat(),
     }
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
     with open(latest_json, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    with open(repo_json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
 
     return {
         "markdown": md_path,
         "meta": meta_path,
         "json": json_path,
+        "repo_markdown": repo_md_path,
+        "repo_json": repo_json_path,
     }
 
 
