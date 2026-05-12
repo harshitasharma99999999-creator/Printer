@@ -34,9 +34,16 @@ jobs:
         with:
           node-version: "20"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install blog dependencies
         working-directory: blog_site
         run: npm install
+
+      - name: Install Python dependencies for X post
+        run: pip install tweepy termcolor
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
