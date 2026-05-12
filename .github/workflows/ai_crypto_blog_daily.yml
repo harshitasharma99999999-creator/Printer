@@ -1,0 +1,95 @@
+name: AI Crypto Blog - Daily
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch: {}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: ai-crypto-blog-daily
+  cancel-in-progress: true
+
+jobs:
+  publish_blog:
+    name: Generate + Publish Blog
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create config.json
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "verbose": true,
+            "firefox_profile": "",
+            "headless": true,
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_model": "tinyllama",
+            "groq_api_key": "",
+            "groq_model": "llama-3.3-70b-versatile",
+            "nanobanana2_api_base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "nanobanana2_api_key": "${{ secrets.GEMINI_API_KEY }}",
+            "nanobanana2_model": "gemini-2.5-flash-image",
+            "nanobanana2_aspect_ratio": "9:16",
+            "threads": 2,
+            "zip_url": "",
+            "is_for_kids": false,
+            "google_maps_scraper": "",
+            "email": {"smtp_server": "smtp.gmail.com", "smtp_port": 587, "username": "", "password": ""},
+            "google_maps_scraper_niche": "",
+            "scraper_timeout": 300,
+            "outreach_message_subject": "",
+            "outreach_message_body_file": "outreach_message.html",
+            "stt_provider": "local_whisper",
+            "whisper_model": "base",
+            "whisper_device": "auto",
+            "whisper_compute_type": "int8",
+            "assembly_ai_api_key": "",
+            "tts_voice": "Jasper",
+            "font": "bold_font.ttf",
+            "imagemagick_path": "/usr/bin/convert",
+            "script_sentence_length": 5,
+            "affiliate_link": "",
+            "gumroad_access_token": "",
+            "ebook_price": 4.99,
+            "ebook_author": "Harshita Sharma",
+            "kdp_firefox_profile": "",
+            "gumroad_firefox_profile": "",
+            "kdp_affiliate_link": "",
+            "kdp_email": "",
+            "kdp_password": ""
+          }
+          EOF
+
+      - name: Generate and publish AI + Crypto blog
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          MEDIUM_INTEGRATION_TOKEN: ${{ secrets.MEDIUM_INTEGRATION_TOKEN }}
+          HASHNODE_ACCESS_TOKEN: ${{ secrets.HASHNODE_ACCESS_TOKEN }}
+          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+          BLOG_NICHE: "artificial intelligence crypto blockchain web3 bitcoin ethereum ai agents onchain analytics defi crypto trading automation market structure"
+        run: python src/ai_crypto_blog_runner.py
+
+      - name: Upload generated article artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-crypto-blog
+          path: |
+            .mp/last_ai_crypto_blog.md
+            .mp/last_ai_crypto_blog.txt
+            .mp/*ai-crypto-blog*.md
+            .mp/*ai-crypto-blog*.txt
+          if-no-files-found: ignore
