@@ -7,7 +7,6 @@ on:
       - "blog_site/**"
       - "content/ai-crypto/**"
       - ".github/workflows/seo_blog_vercel.yml"
-      - "src/blog_twitter_runner.py"
   workflow_run:
     workflows: ["AI Crypto Blog - Daily"]
     types: [completed]
@@ -34,16 +33,9 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install blog dependencies
         working-directory: blog_site
         run: npm install
-
-      - name: Install Python dependencies for X post
-        run: pip install tweepy termcolor
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -64,7 +56,7 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           NEXT_PUBLIC_SITE_URL: https://blogsite-hazel-one.vercel.app
-          NEXT_PUBLIC_ADSENSE_CLIENT: ${{ secrets.NEXT_PUBLIC_ADSENSE_CLIENT }}
+          NEXT_PUBLIC_ADSENSE_CLIENT: pub-4600664722524141
           NEXT_PUBLIC_ADSENSE_SLOT_IN_ARTICLE: ${{ secrets.NEXT_PUBLIC_ADSENSE_SLOT_IN_ARTICLE }}
           NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR: ${{ secrets.NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR }}
         run: vercel build --prod --token=$VERCEL_TOKEN
@@ -74,13 +66,3 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
-
-      - name: Post latest article to X
-        env:
-          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
-          BLOG_SITE_URL: https://blogsite-hazel-one.vercel.app
-          BLOG_CONTENT_DIR: content/ai-crypto
-        run: python src/blog_twitter_runner.py

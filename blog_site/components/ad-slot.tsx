@@ -29,12 +29,16 @@ export function AdSlot({ slot, label = "Advertisement" }: AdSlotProps) {
     }
   }, [client, slot]);
 
-  if (!client || !slot) {
+  if (!client) {
+    return null;
+  }
+
+  if (!slot) {
     return (
       <div className="ad-shell">
         <strong>{label}</strong>
         <p className="ad-note">
-          AdSense placeholder. Add your `NEXT_PUBLIC_ADSENSE_CLIENT` and slot IDs to show real ads.
+          Auto Ads is enabled for this page. AdSense can place ads here automatically once the site is approved.
         </p>
       </div>
     );

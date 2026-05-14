@@ -38,6 +38,11 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} | AI and Crypto Blog`,
     description: siteConfig.description,
   },
+  other: siteConfig.adsenseClient
+    ? {
+        "google-adsense-account": siteConfig.adsenseClient,
+      }
+    : undefined,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

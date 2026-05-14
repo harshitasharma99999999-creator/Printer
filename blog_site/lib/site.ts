@@ -1,3 +1,21 @@
+function normalizeAdSenseClient(value: string): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.startsWith("ca-pub-")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("pub-")) {
+    return `ca-${trimmed}`;
+  }
+  return trimmed;
+}
+
+const defaultAdSensePublisherId = "pub-4600664722524141";
+const configuredAdSenseClient =
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT || defaultAdSensePublisherId;
+
 export const siteConfig = {
   name: "Signal & Chain",
   shortName: "SignalChain",
@@ -7,7 +25,7 @@ export const siteConfig = {
     process.env.NEXT_PUBLIC_SITE_URL ||
     "https://harshitasharma99999999-creator.github.io/Printer",
   defaultBasePath: process.env.SITE_BASE_PATH || "",
-  adsenseClient: process.env.NEXT_PUBLIC_ADSENSE_CLIENT || "",
+  adsenseClient: normalizeAdSenseClient(configuredAdSenseClient),
   adsenseSlotInArticle: process.env.NEXT_PUBLIC_ADSENSE_SLOT_IN_ARTICLE || "",
   adsenseSlotSidebar: process.env.NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR || "",
   xHandle: "@harshita",
