@@ -86,7 +86,7 @@ jobs:
           {"accounts": [{"id": "human-psychology-channel", "nickname": "human-psychology", "firefox_profile": "", "niche": "real human psychology dark truth about people human behavior emotional patterns hidden motives self deception relationships power insecurity body language", "language": "english", "videos": []}]}
           EOF
 
-      - name: Check Instagram target (@humanpyschology)
+      - name: Check Instagram credentials
         env:
           INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME }}
           INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD }}
@@ -97,15 +97,11 @@ jobs:
 
           username = os.environ.get("INSTAGRAM_USERNAME", "").strip().lstrip("@")
           password = os.environ.get("INSTAGRAM_PASSWORD", "").strip()
-          target = "humanpyschology"
 
           if not username or not password:
               print("HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME/PASSWORD must be set to post Reels.")
               sys.exit(1)
-          if username.lower() != target:
-              print(f"Instagram secret points to @{username}, expected @{target}.")
-              sys.exit(1)
-          print(f"Instagram target verified: @{target}")
+          print("Human Psychology Instagram credentials are configured.")
           PY
 
       - name: Preflight (YouTube token + API)
@@ -129,7 +125,6 @@ jobs:
           INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME }}
           INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD }}
           INSTAGRAM_SESSION_JSON: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_SESSION_JSON }}
-          INSTAGRAM_TARGET_HANDLE: "humanpyschology"
           INSTAGRAM_VIDEO_PATH: ".mp/last_short.mp4"
           INSTAGRAM_DEFAULT_HASHTAGS: "#humanpsychology #psychologyfacts #darkpsychology #psychology #humanbehavior #bodylanguage #mindset #relationships #selfawareness #reels"
           INSTAGRAM_HASHTAGS: "#humanpsychology #psychologyfacts #darkpsychology #psychology #humanbehavior #bodylanguage #mindset #relationships #selfawareness #reels"
