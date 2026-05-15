@@ -12,12 +12,20 @@ from status import error, info, warning, success
 
 
 def main():
-    username = os.environ.get("INSTAGRAM_USERNAME", "").strip()
+    username = os.environ.get("INSTAGRAM_USERNAME", "").strip().lstrip("@")
     password = os.environ.get("INSTAGRAM_PASSWORD", "").strip()
+    target_handle = os.environ.get("INSTAGRAM_TARGET_HANDLE", "").strip().lstrip("@")
 
     if not username or not password:
         warning("INSTAGRAM_USERNAME or INSTAGRAM_PASSWORD not set — skipping Instagram upload.")
         sys.exit(0)
+
+    if target_handle and username.lower() != target_handle.lower():
+        error(
+            f"Instagram username @{username} does not match required target "
+            f"@{target_handle}; refusing to post to the wrong account."
+        )
+        sys.exit(1)
 
     mp_dir = os.path.join(ROOT_DIR, ".mp")
     preferred = os.environ.get("INSTAGRAM_VIDEO_PATH", "").strip()
@@ -36,10 +44,13 @@ def main():
         info(f"Instagram: uploading {video_path}")
 
     # Build caption from the latest video's subject stored in youtube.json
-    caption = (
-        "#manifestation #lawofattraction #mindset #motivation "
-        "#spirituality #consciousness #healing #selfgrowth #reels #viral"
-    )
+    default_hashtags = os.environ.get("INSTAGRAM_DEFAULT_HASHTAGS", "").strip()
+    if not default_hashtags:
+        default_hashtags = (
+            "#manifestation #lawofattraction #mindset #motivation "
+            "#spirituality #consciousness #healing #selfgrowth #reels #viral"
+        )
+    caption = default_hashtags
     subject = ""
     try:
         yt_json = os.path.join(mp_dir, "youtube.json")
@@ -51,11 +62,7 @@ def main():
             if videos:
                 subject = videos[-1].get("subject", "")
                 if subject:
-                    caption = (
-                        f"{subject}\n\n"
-                        "#manifestation #lawofattraction #mindset #motivation "
-                        "#spirituality #consciousness #healing #selfgrowth #reels #viral"
-                    )
+                    caption = f"{subject}\n\n{default_hashtags}"
     except Exception:
         pass
 
