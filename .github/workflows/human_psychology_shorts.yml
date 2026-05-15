@@ -88,8 +88,8 @@ jobs:
 
       - name: Check Instagram credentials
         env:
-          INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME }}
-          INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD }}
+          INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME || secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD || secrets.INSTAGRAM_PASSWORD }}
         run: |
           python - << 'PY'
           import os
@@ -122,9 +122,9 @@ jobs:
 
       - name: Upload to Instagram Reels
         env:
-          INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME }}
-          INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD }}
-          INSTAGRAM_SESSION_JSON: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_SESSION_JSON }}
+          INSTAGRAM_USERNAME: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_USERNAME || secrets.INSTAGRAM_USERNAME }}
+          INSTAGRAM_PASSWORD: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_PASSWORD || secrets.INSTAGRAM_PASSWORD }}
+          INSTAGRAM_SESSION_JSON: ${{ secrets.HUMAN_PSYCHOLOGY_INSTAGRAM_SESSION_JSON || secrets.INSTAGRAM_SESSION_JSON }}
           INSTAGRAM_VIDEO_PATH: ".mp/last_short.mp4"
           INSTAGRAM_DEFAULT_HASHTAGS: "#humanpsychology #psychologyfacts #darkpsychology #psychology #humanbehavior #bodylanguage #mindset #relationships #selfawareness #reels"
           INSTAGRAM_HASHTAGS: "#humanpsychology #psychologyfacts #darkpsychology #psychology #humanbehavior #bodylanguage #mindset #relationships #selfawareness #reels"
