@@ -1,0 +1,115 @@
+name: MoneyMarkettt - YouTube Shorts
+
+on:
+  schedule:
+    - cron: "15 4 * * *"
+    - cron: "15 10 * * *"
+    - cron: "15 16 * * *"
+  workflow_dispatch: {}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: moneymarkettt-shorts
+  cancel-in-progress: true
+
+jobs:
+  shorts:
+    name: Shorts
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg imagemagick libjpeg-dev zlib1g-dev libpng-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create config.json
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "verbose": true,
+            "firefox_profile": "",
+            "headless": true,
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_model": "tinyllama",
+            "groq_api_key": "",
+            "groq_model": "llama-3.1-8b-instant",
+            "nanobanana2_api_base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "nanobanana2_api_key": "${{ secrets.GEMINI_API_KEY }}",
+            "nanobanana2_model": "gemini-2.5-flash-image",
+            "nanobanana2_aspect_ratio": "9:16",
+            "threads": 2,
+            "zip_url": "",
+            "is_for_kids": false,
+            "google_maps_scraper": "",
+            "email": {"smtp_server": "smtp.gmail.com", "smtp_port": 587, "username": "", "password": ""},
+            "google_maps_scraper_niche": "",
+            "scraper_timeout": 300,
+            "outreach_message_subject": "",
+            "outreach_message_body_file": "outreach_message.html",
+            "stt_provider": "local_whisper",
+            "whisper_model": "base",
+            "whisper_device": "auto",
+            "whisper_compute_type": "int8",
+            "assembly_ai_api_key": "",
+            "tts_voice": "Hugo",
+            "font": "bold_font.ttf",
+            "imagemagick_path": "/usr/bin/convert",
+            "script_sentence_length": 5,
+            "affiliate_link": "",
+            "gumroad_access_token": "",
+            "ebook_price": 4.99,
+            "ebook_author": "Harshita Sharma",
+            "kdp_firefox_profile": "",
+            "gumroad_firefox_profile": "",
+            "kdp_affiliate_link": "",
+            "kdp_email": "",
+            "kdp_password": ""
+          }
+          EOF
+
+      - name: Seed .mp cache (MoneyMarkettt channel)
+        run: |
+          mkdir -p .mp
+          cat > .mp/youtube.json << 'EOF'
+          {"accounts": [{"id": "moneymarkettt-channel", "nickname": "moneymarkettt", "firefox_profile": "", "niche": "cool facts about stock market forex crypto trading investing market history volatility money psychology", "language": "english", "videos": []}]}
+          EOF
+
+      - name: Preflight (YouTube token + API)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.MONEYMARKETTT_YOUTUBE_TOKEN_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/preflight_local.py
+
+      - name: Run Shorts pipeline (MoneyMarkettt)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.MONEYMARKETTT_YOUTUBE_TOKEN_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SHORTS_NICHE: "cool facts about stock market forex crypto trading investing market history volatility money psychology"
+          YOUTUBE_AUTO_EBOOK: "false"
+        run: python src/cron.py youtube moneymarkettt-channel
+
+      - name: Upload debug artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moneymarkettt-shorts-debug
+          path: |
+            .mp/*.png
+            .mp/*.json
+            .mp/*.mp4
+            .mp/*.txt
+          if-no-files-found: ignore

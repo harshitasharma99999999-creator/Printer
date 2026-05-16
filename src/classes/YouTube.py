@@ -3,6 +3,7 @@ import base64
 import json
 import time
 import os
+import subprocess
 import requests
 
 from utils import *
@@ -76,6 +77,22 @@ class YouTube:
         niche = (self.niche or "").lower()
         return "psychology" in niche or "behavior" in niche or "dark truth" in niche
 
+    def _is_finance_channel(self) -> bool:
+        niche = (self.niche or "").lower()
+        finance_terms = [
+            "stock",
+            "stock market",
+            "stockmarket",
+            "forex",
+            "crypto",
+            "trading",
+            "investing",
+            "finance",
+            "market facts",
+            "bitcoin",
+        ]
+        return any(term in niche for term in finance_terms)
+
     @property
     def niche(self) -> str:
         """
@@ -133,6 +150,28 @@ Return ONLY the video topic as one sentence. Nothing else."""
                 error("Failed to generate Topic.")
             self.subject = completion
             return completion
+        if self._is_finance_channel():
+            completion = self.generate_response(
+                f"""Generate a compelling YouTube Shorts topic about: {self.niche}
+Style: fast, cool, educational market facts about stocks, forex, crypto, macro moves, trader psychology, money history, and surprising chart facts.
+Use formats like:
+- "The Stock Market Fact Most Beginners Never Learn"
+- "The Forex Truth Hidden In One Number"
+- "This Crypto Fact Sounds Fake But It Is Real"
+- "Why Traders Watch This One Market Signal"
+- "The Weird History Behind A Market Crash"
+- "What Most People Get Wrong About Bitcoin"
+- "The Fastest Way To Understand Market Volatility"
+Rules:
+- Make it sound factual, punchy, and curiosity-driven
+- Focus on one cool fact, one surprising pattern, or one powerful market insight
+- Return ONLY the video topic as one sentence
+- No emojis, no numbering, nothing else"""
+            )
+            if not completion:
+                error("Failed to generate Topic.")
+            self.subject = completion
+            return completion
         completion = self.generate_response(
             f"""Generate a compelling YouTube Shorts topic about: {self.niche}
 Style: like the channel "YourInnerGuide" — deep, guiding, truth-revealing. The video must feel like a personal spiritual guide is speaking directly to the viewer, revealing an ultimate truth that changes how they see reality.
@@ -181,6 +220,39 @@ Rules:
 - Spoken words only
 - Use YOU and PEOPLE naturally
 - Stay grounded in psychology, behavior, emotional patterns, and dark truths
+- Language: {self.language}
+
+Subject: {self.subject}"""
+            completion = self.generate_response(prompt)
+            completion = re.sub(r"\*", "", completion)
+            if not completion:
+                error("The generated script is empty.")
+                return
+            if len(completion) > 5000:
+                if get_verbose():
+                    warning("Generated Script is too long. Retrying...")
+                return self.generate_script()
+            self.script = completion
+            return completion
+        if self._is_finance_channel():
+            prompt = f"""You are a sharp financial educator creating a viral YouTube Short.
+Write a script of exactly {sentence_length} sentences about the subject below.
+
+Tone:
+- Fast, clear, and surprisingly insightful
+- Sounds like a cool market fact expert, not a boring textbook
+- FIRST SENTENCE must stop attention immediately with a surprising market truth or stat
+- Keep each sentence compact, useful, and easy to follow
+- Explain one fact, pattern, lesson, or historical insight about stocks, forex, or crypto
+- End with a strong takeaway that makes the viewer feel smarter about markets
+
+Rules:
+- Exactly {sentence_length} sentences
+- NO markdown, NO titles, NO bullet points
+- NO filler like "in this video"
+- Spoken words only
+- Keep it educational, factual, and engaging
+- No promises of profit, no financial advice wording
 - Language: {self.language}
 
 Subject: {self.subject}"""
@@ -379,6 +451,65 @@ Subject: {self.subject}"""
 
             self.metadata = {"title": title, "description": description, "tags": tags}
             return self.metadata
+        if self._is_finance_channel():
+            title = self.generate_response(
+                f"""Generate a YouTube Shorts title for the following subject.
+Style: finance facts channel focused on cool stock market, forex, and crypto insights.
+Use formats like:
+"The Market Fact Nobody Tells You", "This Crypto Truth Is Wild", "Why Traders Watch This", "The Hidden Forex Rule"
+Include 2-3 hashtags like #StockMarket #Forex #Crypto
+Only return the title. Under 100 characters.
+Subject: {self.subject}"""
+            )
+
+            if len(title) > 100:
+                if get_verbose():
+                    warning("Generated Title is too long. Retrying...")
+                return self.generate_metadata()
+
+            description = self.generate_response(
+                f"Please generate a YouTube Video Description for the following script: {self.script}. "
+                f"Tone: confident, clear, educational, and market-smart. No hype. No markdown. "
+                f"Only return the description, nothing else."
+            )
+
+            tags_response = self.generate_response(
+                f"Generate 10-15 relevant YouTube tags for a video about: {self.subject}. "
+                f"Return ONLY a comma-separated list of tags, nothing else. "
+                f"Tags should be short, search-friendly, and relevant to stock market, forex, trading, investing, and crypto facts."
+            )
+
+            tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+            broad_tags = [
+                "stock market",
+                "forex",
+                "crypto",
+                "trading",
+                "investing",
+                "market facts",
+                "finance",
+                "bitcoin",
+                "money",
+                "shorts",
+            ]
+            for tag in broad_tags:
+                if tag.lower() not in {t.lower() for t in tags}:
+                    tags.append(tag)
+            tags = tags[:15]
+
+            subject_line = self._sanitize_youtube_text(self.subject, limit=120, multiline=False)
+            summary_line = self._sanitize_youtube_text(description, limit=220, multiline=False)
+            if not summary_line:
+                summary_line = "Cool facts and sharp lessons about stocks, forex, crypto, and how markets really move."
+
+            description = (
+                f"{subject_line}\n\n"
+                f"{summary_line}\n\n"
+                "#Shorts #StockMarket #Forex #Crypto #Trading"
+            )
+
+            self.metadata = {"title": title, "description": description, "tags": tags}
+            return self.metadata
         title = self.generate_response(
             f"""Generate a YouTube video title for the following subject.
 Style: Jung Thoughts channel — use formats like:
@@ -528,6 +659,63 @@ Subject: {self.subject}"""
             success(f"Generated {len(image_prompts)} Image Prompts.")
             return image_prompts
 
+        if self._is_finance_channel():
+            prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about financial markets.
+Each image must feel modern, premium, and scroll-stopping, showing the energy of stocks, forex, crypto, charts, trading floors, glowing tickers, global money flows, and macro movement.
+Style: hyper-realistic finance visuals, dramatic lighting, digital screens, neon chart reflections, city skylines, trading desks, coins, candlesticks, world maps, motion and tension.
+DO NOT generate fantasy art, cartoons, or unreadable text-heavy images.
+Return ONLY a JSON array of {n_prompts} strings, nothing else.
+
+Subject: {self.subject}"""
+
+            completion = (
+                str(self.generate_response(prompt))
+                .replace("```json", "")
+                .replace("```", "")
+                .strip()
+            )
+
+            image_prompts = []
+
+            try:
+                parsed = json.loads(completion)
+                if isinstance(parsed, list):
+                    image_prompts = [str(p) for p in parsed if p]
+                elif isinstance(parsed, dict) and "image_prompts" in parsed:
+                    image_prompts = parsed["image_prompts"]
+            except Exception:
+                r = re.compile(r"\[.*?\]", re.DOTALL)
+                match = r.search(completion)
+                if match:
+                    try:
+                        image_prompts = json.loads(match.group())
+                    except Exception:
+                        pass
+
+            if not image_prompts:
+                if _retries < 3:
+                    if get_verbose():
+                        warning("Failed to parse image prompts. Retrying...")
+                    return self.generate_prompts(_retries=_retries + 1)
+                if get_verbose():
+                    warning("Using fallback image prompts.")
+                image_prompts = [
+                    f"ultra realistic glowing stock market screens with green and red candlesticks, dramatic trading floor mood, {self.subject}",
+                    f"bitcoin and forex charts reflected on a trader's face in a dark modern office, cinematic finance lighting, {self.subject}",
+                    f"global market map with currency lines, stock tickers, and moving data streams, premium macro finance visual, {self.subject}",
+                    f"close-up of hands analyzing multiple trading charts on monitors, high tension, realistic investing scene, {self.subject}",
+                    f"city skyline at night blended with crypto coins, market graphs, and bullish-bearish tension, cinematic, {self.subject}",
+                ]
+
+            image_prompts = image_prompts[:n_prompts]
+            self.image_prompts = image_prompts
+
+            if get_verbose():
+                info(f" => Generated Image Prompts: {image_prompts}")
+            success(f"Generated {len(image_prompts)} Image Prompts.")
+
+            return image_prompts
+
         prompt = f"""Generate exactly {n_prompts} deeply spiritual and cinematic image prompts for a YouTube Short about consciousness, reality shifting, and inner truth.
 Each image must feel like a visual gateway into a higher dimension — breathtaking, otherworldly, and deeply meaningful.
 Style: hyper-realistic spiritual photography — soft divine light, cosmic infinity, the feeling of awakening, sacred and timeless.
@@ -586,6 +774,35 @@ Subject: {self.subject}"""
         success(f"Generated {len(image_prompts)} Image Prompts.")
 
         return image_prompts
+
+    def _generate_finance_music(self, duration: float) -> str:
+        out_path = os.path.join(ROOT_DIR, ".mp", f"finance_ambient_{uuid4().hex[:6]}.wav")
+        expr = (
+            "(0.10*sin(2*PI*110.00*t)"
+            "+0.08*sin(2*PI*220.00*t)"
+            "+0.06*sin(2*PI*329.63*t)"
+            "+0.04*sin(2*PI*440.00*t)"
+            "+0.03*sin(2*PI*554.37*t))"
+            "*(0.82+0.18*sin(2*PI*0.55*t))"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"aevalsrc={expr}:s=22050:d={int(duration) + 2}",
+            "-af", f"afade=t=in:st=0:d=1.5,afade=t=out:st={max(0, int(duration) - 1)}:d=2",
+            out_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            if get_verbose():
+                warning(
+                    "Finance ambient music generation failed: "
+                    f"{result.stderr.decode(errors='ignore')[:300]}"
+                )
+            return ""
+        if get_verbose():
+            info(f"Generated finance ambient music: {out_path}")
+        return out_path
 
     def _persist_image(self, image_bytes: bytes, provider_label: str) -> str:
         """
@@ -960,6 +1177,9 @@ Subject: {self.subject}"""
         final_clip = concatenate_videoclips(clips)
         final_clip = final_clip.set_fps(30)
         random_song = choose_random_song()
+        generated_music = ""
+        if not random_song and self._is_finance_channel():
+            generated_music = self._generate_finance_music(max_duration)
 
         subtitles = None
         try:
@@ -970,9 +1190,10 @@ Subject: {self.subject}"""
         except Exception as e:
             warning(f"Failed to generate subtitles, continuing without subtitles: {e}")
 
-        if random_song:
-            random_song_clip = AudioFileClip(random_song).set_fps(44100)
-            random_song_clip = random_song_clip.fx(afx.volumex, 0.1)
+        if random_song or generated_music:
+            music_path = random_song or generated_music
+            random_song_clip = AudioFileClip(music_path).set_fps(44100)
+            random_song_clip = random_song_clip.fx(afx.volumex, 0.1 if random_song else 0.16)
             comp_audio = CompositeAudioClip([tts_clip.set_fps(44100), random_song_clip])
         else:
             comp_audio = tts_clip.set_fps(44100)
