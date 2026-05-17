@@ -111,6 +111,15 @@ class YouTube:
                 return logo_path
         return ""
 
+    def _is_music_only_channel(self) -> bool:
+        nickname = (self._account_nickname or "").lower()
+        account_uuid = (self._account_uuid or "").lower()
+        return (
+            self._is_cryptohub_channel()
+            or "moneymarkettt" in nickname
+            or "moneymarkettt" in account_uuid
+        )
+
     @property
     def niche(self) -> str:
         """
@@ -1095,6 +1104,57 @@ Subject: {self.subject}"""
                 warning(f"Failed to add brand logo overlay: {exc}")
             return None
 
+    def _split_script_segments(self) -> List[str]:
+        raw = re.split(r"(?<=[.!?])\s+", str(getattr(self, "script", "") or "").strip())
+        segments = []
+        for item in raw:
+            cleaned = re.sub(r"\s+", " ", item).strip(" .")
+            if not cleaned:
+                continue
+            words = cleaned.split()
+            if len(words) > 9:
+                midpoint = max(4, len(words) // 2)
+                segments.append(" ".join(words[:midpoint]))
+                segments.append(" ".join(words[midpoint:]))
+            else:
+                segments.append(cleaned)
+        return segments or [self._sanitize_youtube_text(getattr(self, "subject", ""), limit=90, multiline=False)]
+
+    def _estimate_music_only_duration(self, segments: List[str]) -> float:
+        count = max(1, len(segments))
+        return float(max(12, min(24, int(round(count * 2.8)))))
+
+    def _build_music_only_text_overlays(self, duration: float):
+        segments = self._split_script_segments()
+        per_segment = duration / max(1, len(segments))
+        clips = []
+
+        for idx, segment in enumerate(segments):
+            color = "#FFD54A" if self._is_cryptohub_channel() else "#FFFFFF"
+            bg_color = "#000000" if self._is_cryptohub_channel() else None
+            clip = (
+                TextClip(
+                    segment.upper() if self._is_cryptohub_channel() else segment,
+                    font=os.path.join(get_fonts_dir(), get_font()),
+                    fontsize=84 if self._is_cryptohub_channel() else 88,
+                    color=color,
+                    stroke_color="black",
+                    stroke_width=5,
+                    kerning=1 if self._is_cryptohub_channel() else 0,
+                    bg_color=bg_color,
+                    size=(940, 320),
+                    align="center",
+                    method="caption",
+                )
+                .set_start(idx * per_segment)
+                .set_duration(per_segment + 0.15)
+                .set_position(("center", 1290 if self._is_cryptohub_channel() else 1230))
+                .crossfadein(0.12)
+            )
+            clips.append(clip)
+
+        return clips
+
     def _persist_image(self, image_bytes: bytes, provider_label: str) -> str:
         """
         Writes generated image bytes to a PNG file in .mp.
@@ -1408,8 +1468,9 @@ Subject: {self.subject}"""
         """
         combined_image_path = os.path.join(ROOT_DIR, ".mp", str(uuid4()) + ".mp4")
         threads = get_threads()
-        tts_clip = AudioFileClip(self.tts_path)
-        max_duration = tts_clip.duration
+        music_only = self._is_music_only_channel()
+        tts_clip = None if music_only else AudioFileClip(self.tts_path)
+        max_duration = self._estimate_music_only_duration(self._split_script_segments()) if music_only else tts_clip.duration
         req_dur = max_duration / len(self.images)
 
         generator = self._build_subtitle_generator()
@@ -1471,16 +1532,27 @@ Subject: {self.subject}"""
             generated_music = self._generate_finance_music(max_duration)
 
         subtitles = None
-        try:
-            subtitles_path = self.generate_subtitles(self.tts_path)
-            equalize_subtitles(subtitles_path, 10)
-            subtitles = SubtitlesClip(subtitles_path, generator)
-            subtitles.set_pos(("center", "center"))
-        except Exception as e:
-            warning(f"Failed to generate subtitles, continuing without subtitles: {e}")
+        if not music_only:
+            try:
+                subtitles_path = self.generate_subtitles(self.tts_path)
+                equalize_subtitles(subtitles_path, 10)
+                subtitles = SubtitlesClip(subtitles_path, generator)
+                subtitles.set_pos(("center", "center"))
+            except Exception as e:
+                warning(f"Failed to generate subtitles, continuing without subtitles: {e}")
 
-        if random_song or generated_music:
-            music_path = random_song or generated_music
+        music_path = random_song or generated_music
+        if music_only:
+            if music_path:
+                music_clip = AudioFileClip(music_path).set_fps(44100)
+                if music_clip.duration < max_duration:
+                    music_clip = afx.audio_loop(music_clip, duration=max_duration)
+                else:
+                    music_clip = music_clip.subclip(0, max_duration)
+                comp_audio = music_clip.fx(afx.volumex, 0.22 if random_song else 0.20)
+            else:
+                comp_audio = AudioClip(lambda t: 0, duration=max_duration, fps=44100)
+        elif music_path:
             random_song_clip = AudioFileClip(music_path).set_fps(44100)
             random_song_clip = random_song_clip.fx(afx.volumex, 0.1 if random_song else 0.16)
             comp_audio = CompositeAudioClip([tts_clip.set_fps(44100), random_song_clip])
@@ -1488,7 +1560,7 @@ Subject: {self.subject}"""
             comp_audio = tts_clip.set_fps(44100)
 
         final_clip = final_clip.set_audio(comp_audio)
-        final_clip = final_clip.set_duration(tts_clip.duration)
+        final_clip = final_clip.set_duration(max_duration)
 
         if subtitles is not None:
             subtitles = subtitles.set_position(("center", "center"))
@@ -1499,14 +1571,16 @@ Subject: {self.subject}"""
                 overlays.append(
                     ColorClip(size=(1080, 1920), color=(0, 0, 0))
                     .set_opacity(0.12)
-                    .set_duration(tts_clip.duration)
+                    .set_duration(max_duration)
                 )
-            headline_clip = self._build_finance_headline_clip(tts_clip.duration)
+            headline_clip = self._build_finance_headline_clip(max_duration)
             if headline_clip is not None:
                 overlays.append(headline_clip)
-            brand_logo = self._build_brand_logo_clip(tts_clip.duration)
+            brand_logo = self._build_brand_logo_clip(max_duration)
             if brand_logo is not None:
                 overlays.append(brand_logo)
+            if music_only:
+                overlays.extend(self._build_music_only_text_overlays(max_duration))
             if subtitles is not None:
                 overlays.append(subtitles)
             final_clip = CompositeVideoClip(overlays, size=(1080, 1920))
@@ -1628,8 +1702,10 @@ Subject: {self.subject}"""
             for prompt in self.image_prompts:
                 self.generate_image(prompt)
 
-            # Generate the TTS
-            self.generate_script_to_speech(tts_instance)
+            # Generate TTS for voice-led channels only. CryptoHub and MoneyMarkettt
+            # are intentionally rendered as text + music Shorts.
+            if not self._is_music_only_channel():
+                self.generate_script_to_speech(tts_instance)
 
             # Combine everything
             path = self.combine()
