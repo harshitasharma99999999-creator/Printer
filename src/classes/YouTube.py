@@ -662,7 +662,7 @@ Subject: {self.subject}"""
         if self._is_finance_channel():
             prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about financial markets.
 Each image must feel modern, premium, and scroll-stopping, showing the energy of stocks, forex, crypto, charts, trading floors, glowing tickers, global money flows, and macro movement.
-Style: hyper-realistic finance visuals, dramatic lighting, digital screens, neon chart reflections, city skylines, trading desks, coins, candlesticks, world maps, motion and tension.
+Style: strict black and white finance visuals, monochrome cinematic contrast, dramatic lighting, deep shadows, glossy screens, chart reflections, city skylines, trading desks, coins, candlesticks, world maps, motion and tension.
 DO NOT generate fantasy art, cartoons, or unreadable text-heavy images.
 Return ONLY a JSON array of {n_prompts} strings, nothing else.
 
@@ -700,11 +700,11 @@ Subject: {self.subject}"""
                 if get_verbose():
                     warning("Using fallback image prompts.")
                 image_prompts = [
-                    f"ultra realistic glowing stock market screens with green and red candlesticks, dramatic trading floor mood, {self.subject}",
-                    f"bitcoin and forex charts reflected on a trader's face in a dark modern office, cinematic finance lighting, {self.subject}",
-                    f"global market map with currency lines, stock tickers, and moving data streams, premium macro finance visual, {self.subject}",
-                    f"close-up of hands analyzing multiple trading charts on monitors, high tension, realistic investing scene, {self.subject}",
-                    f"city skyline at night blended with crypto coins, market graphs, and bullish-bearish tension, cinematic, {self.subject}",
+                    f"strict black and white stock market screens with monochrome candlesticks and dramatic trading floor mood, {self.subject}",
+                    f"black and white bitcoin and forex charts reflected on a trader's face in a dark modern office, cinematic finance lighting, {self.subject}",
+                    f"monochrome global market map with currency lines, stock tickers, and moving data streams, premium macro finance visual, {self.subject}",
+                    f"black and white close-up of hands analyzing multiple trading charts on monitors, high tension, realistic investing scene, {self.subject}",
+                    f"black and white city skyline at night blended with crypto coins, market graphs, and bullish-bearish tension, cinematic, {self.subject}",
                 ]
 
             image_prompts = image_prompts[:n_prompts]
@@ -778,18 +778,26 @@ Subject: {self.subject}"""
     def _generate_finance_music(self, duration: float) -> str:
         out_path = os.path.join(ROOT_DIR, ".mp", f"finance_ambient_{uuid4().hex[:6]}.wav")
         expr = (
-            "(0.10*sin(2*PI*110.00*t)"
-            "+0.08*sin(2*PI*220.00*t)"
-            "+0.06*sin(2*PI*329.63*t)"
-            "+0.04*sin(2*PI*440.00*t)"
-            "+0.03*sin(2*PI*554.37*t))"
-            "*(0.82+0.18*sin(2*PI*0.55*t))"
+            "(0.11*sin(2*PI*55.00*t)"
+            "+0.09*sin(2*PI*110.00*t)"
+            "+0.07*sin(2*PI*164.81*t)"
+            "+0.05*sin(2*PI*220.00*t)"
+            "+0.035*sin(2*PI*329.63*t)"
+            "+0.018*sin(2*PI*880.00*t)*(0.55+0.45*sin(2*PI*2.2*t)))"
+            "*(0.76+0.24*sin(2*PI*0.42*t))"
         )
         cmd = [
             "ffmpeg", "-y",
             "-f", "lavfi",
             "-i", f"aevalsrc={expr}:s=22050:d={int(duration) + 2}",
-            "-af", f"afade=t=in:st=0:d=1.5,afade=t=out:st={max(0, int(duration) - 1)}:d=2",
+            "-af",
+            (
+                "highpass=f=40,"
+                "lowpass=f=3200,"
+                "aecho=0.7:0.65:35:0.14,"
+                "afade=t=in:st=0:d=1.2,"
+                f"afade=t=out:st={max(0, int(duration) - 1)}:d=2"
+            ),
             out_path,
         ]
         result = subprocess.run(cmd, capture_output=True)
@@ -803,6 +811,57 @@ Subject: {self.subject}"""
         if get_verbose():
             info(f"Generated finance ambient music: {out_path}")
         return out_path
+
+    def _build_subtitle_generator(self):
+        subtitle_color = "#FFFFFF" if self._is_finance_channel() else "#FFFF00"
+        subtitle_stroke = 7 if self._is_finance_channel() else 5
+        subtitle_fontsize = 92 if self._is_finance_channel() else 100
+
+        return lambda txt: TextClip(
+            txt,
+            font=os.path.join(get_fonts_dir(), get_font()),
+            fontsize=subtitle_fontsize,
+            color=subtitle_color,
+            stroke_color="black",
+            stroke_width=subtitle_stroke,
+            size=(960, 1720),
+            align="center",
+            method="caption",
+        )
+
+    def _build_finance_headline_clip(self, duration: float):
+        headline = self._sanitize_youtube_text(
+            getattr(self, "subject", ""),
+            limit=110,
+            multiline=False,
+        ).upper()
+        if not headline:
+            return None
+
+        headline = headline.replace(" - ", "\n").replace(" — ", "\n")
+        if len(headline) > 46 and "\n" not in headline:
+            words = headline.split()
+            midpoint = max(1, len(words) // 2)
+            headline = " ".join(words[:midpoint]) + "\n" + " ".join(words[midpoint:])
+
+        return (
+            TextClip(
+                headline,
+                font=os.path.join(get_fonts_dir(), get_font()),
+                fontsize=74,
+                color="#FFFFFF",
+                stroke_color="black",
+                stroke_width=3,
+                bg_color="#000000",
+                kerning=2,
+                size=(960, 210),
+                align="center",
+                method="caption",
+            )
+            .set_position(("center", 90))
+            .set_duration(duration)
+            .crossfadein(0.2)
+        )
 
     def _persist_image(self, image_bytes: bytes, provider_label: str) -> str:
         """
@@ -1121,17 +1180,7 @@ Subject: {self.subject}"""
         max_duration = tts_clip.duration
         req_dur = max_duration / len(self.images)
 
-        # Make a generator that returns a TextClip when called with consecutive
-        generator = lambda txt: TextClip(
-            txt,
-            font=os.path.join(get_fonts_dir(), get_font()),
-            fontsize=100,
-            color="#FFFF00",
-            stroke_color="black",
-            stroke_width=5,
-            size=(1080, 1920),
-            method="caption",
-        )
+        generator = self._build_subtitle_generator()
 
         print(colored("[+] Combining images...", "blue"))
 
@@ -1168,6 +1217,11 @@ Subject: {self.subject}"""
                     )
                 clip = clip.resize((1080, 1920))
 
+                if self._is_finance_channel():
+                    clip = clip.fx(vfx.blackwhite)
+                    clip = clip.fx(vfx.lum_contrast, lum=0, contrast=28, contrast_thr=110)
+                    clip = clip.fadein(0.15).fadeout(0.15)
+
                 # FX (Fade In)
                 # clip = clip.fadein(2)
 
@@ -1202,6 +1256,17 @@ Subject: {self.subject}"""
         final_clip = final_clip.set_duration(tts_clip.duration)
 
         if subtitles is not None:
+            subtitles = subtitles.set_position(("center", "center"))
+
+        if self._is_finance_channel():
+            overlays = [final_clip]
+            headline_clip = self._build_finance_headline_clip(tts_clip.duration)
+            if headline_clip is not None:
+                overlays.append(headline_clip)
+            if subtitles is not None:
+                overlays.append(subtitles)
+            final_clip = CompositeVideoClip(overlays, size=(1080, 1920))
+        elif subtitles is not None:
             final_clip = CompositeVideoClip([final_clip, subtitles])
 
         final_clip.write_videofile(combined_image_path, threads=threads)
