@@ -93,6 +93,24 @@ class YouTube:
         ]
         return any(term in niche for term in finance_terms)
 
+    def _is_cryptohub_channel(self) -> bool:
+        nickname = (self._account_nickname or "").lower()
+        account_uuid = (self._account_uuid or "").lower()
+        niche = (self.niche or "").lower()
+        return (
+            "cryptohub" in nickname
+            or "cryptohub" in account_uuid
+            or "crypto hub" in niche
+            or "cryptohub" in niche
+        )
+
+    def _get_brand_logo_path(self) -> str:
+        if self._is_cryptohub_channel():
+            logo_path = os.path.join(ROOT_DIR, "assets", "channel_branding", "cryptohub_logo.png")
+            if os.path.exists(logo_path):
+                return logo_path
+        return ""
+
     @property
     def niche(self) -> str:
         """
@@ -145,6 +163,28 @@ Use formats like:
 - "The Dark Side Of People Pleasing"
 - "Why Some People Only Value You After Losing You"
 Return ONLY the video topic as one sentence. Nothing else."""
+            )
+            if not completion:
+                error("Failed to generate Topic.")
+            self.subject = completion
+            return completion
+        if self._is_cryptohub_channel():
+            completion = self.generate_response(
+                f"""Generate a compelling YouTube Shorts topic about: {self.niche}
+Style: premium crypto facts and crypto market insights for the CryptoHub brand.
+Use formats like:
+- "The Bitcoin Fact Most People Miss"
+- "The Crypto Signal Smart Traders Watch"
+- "Why Ethereum Moves Before Altcoins"
+- "The Hidden Truth Behind This Crypto Rally"
+- "What Most Beginners Never Notice In Crypto"
+- "The On-Chain Clue That Changes Everything"
+- "The Crypto Psychology Behind Panic Selling"
+Rules:
+- Focus only on crypto, bitcoin, ethereum, altcoins, blockchain, on-chain data, market structure, or trader psychology
+- Make it sharp, premium, curiosity-driven, and factual
+- Return ONLY the video topic as one sentence
+- No emojis, no numbering, nothing else"""
             )
             if not completion:
                 error("Failed to generate Topic.")
@@ -220,6 +260,39 @@ Rules:
 - Spoken words only
 - Use YOU and PEOPLE naturally
 - Stay grounded in psychology, behavior, emotional patterns, and dark truths
+- Language: {self.language}
+
+Subject: {self.subject}"""
+            completion = self.generate_response(prompt)
+            completion = re.sub(r"\*", "", completion)
+            if not completion:
+                error("The generated script is empty.")
+                return
+            if len(completion) > 5000:
+                if get_verbose():
+                    warning("Generated Script is too long. Retrying...")
+                return self.generate_script()
+            self.script = completion
+            return completion
+        if self._is_cryptohub_channel():
+            prompt = f"""You are CryptoHub's sharp crypto educator creating a viral YouTube Short.
+Write a script of exactly {sentence_length} sentences about the subject below.
+
+Tone:
+- Premium, confident, and intelligent
+- Sounds like a strong crypto analyst, not a hype influencer
+- FIRST SENTENCE must stop attention with a surprising crypto fact, pattern, or truth
+- Keep each sentence short, visual, and easy to follow
+- Focus on bitcoin, ethereum, altcoins, blockchain, on-chain behavior, or crypto market psychology
+- End with a strong insight that makes the viewer feel more informed about crypto
+
+Rules:
+- Exactly {sentence_length} sentences
+- NO markdown, NO titles, NO bullet points
+- NO filler like "in this video"
+- Spoken words only
+- No profit promises, no financial advice wording
+- Keep it factual, exciting, and clean
 - Language: {self.language}
 
 Subject: {self.subject}"""
@@ -451,6 +524,65 @@ Subject: {self.subject}"""
 
             self.metadata = {"title": title, "description": description, "tags": tags}
             return self.metadata
+        if self._is_cryptohub_channel():
+            title = self.generate_response(
+                f"""Generate a YouTube Shorts title for the following subject.
+Style: premium CryptoHub channel focused on bitcoin, crypto facts, market psychology, and sharp insights.
+Use formats like:
+"The Bitcoin Truth Nobody Sees", "This Crypto Signal Matters", "Why Ethereum Moves First", "The Hidden Crypto Pattern"
+Include 2-3 hashtags like #Crypto #Bitcoin #Ethereum
+Only return the title. Under 100 characters.
+Subject: {self.subject}"""
+            )
+
+            if len(title) > 100:
+                if get_verbose():
+                    warning("Generated Title is too long. Retrying...")
+                return self.generate_metadata()
+
+            description = self.generate_response(
+                f"Please generate a YouTube Video Description for the following script: {self.script}. "
+                f"Tone: premium, clear, confident, crypto-smart. No hype. No markdown. "
+                f"Only return the description, nothing else."
+            )
+
+            tags_response = self.generate_response(
+                f"Generate 10-15 relevant YouTube tags for a video about: {self.subject}. "
+                f"Return ONLY a comma-separated list of tags, nothing else. "
+                f"Tags should be short, search-friendly, and relevant to crypto, bitcoin, ethereum, altcoins, blockchain, and market insights."
+            )
+
+            tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+            broad_tags = [
+                "crypto",
+                "bitcoin",
+                "ethereum",
+                "altcoins",
+                "blockchain",
+                "crypto news",
+                "crypto facts",
+                "on chain",
+                "market psychology",
+                "shorts",
+            ]
+            for tag in broad_tags:
+                if tag.lower() not in {t.lower() for t in tags}:
+                    tags.append(tag)
+            tags = tags[:15]
+
+            subject_line = self._sanitize_youtube_text(self.subject, limit=120, multiline=False)
+            summary_line = self._sanitize_youtube_text(description, limit=220, multiline=False)
+            if not summary_line:
+                summary_line = "Sharp crypto facts and premium market insights about bitcoin, ethereum, altcoins, and blockchain behavior."
+
+            description = (
+                f"{subject_line}\n\n"
+                f"{summary_line}\n\n"
+                "#Shorts #Crypto #Bitcoin #Ethereum #CryptoHub"
+            )
+
+            self.metadata = {"title": title, "description": description, "tags": tags}
+            return self.metadata
         if self._is_finance_channel():
             title = self.generate_response(
                 f"""Generate a YouTube Shorts title for the following subject.
@@ -659,6 +791,63 @@ Subject: {self.subject}"""
             success(f"Generated {len(image_prompts)} Image Prompts.")
             return image_prompts
 
+        if self._is_cryptohub_channel():
+            prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about crypto markets.
+Each image must feel premium, futuristic, and branded for a black, gold, and silver crypto channel, showing bitcoin, ethereum, candlestick charts, blockchain signals, digital market dashboards, and high-end macro tension.
+Style: luxury crypto visuals, deep black background, gold highlights, silver accents, dramatic lighting, glossy screens, coins, on-chain data, market motion, and premium contrast.
+DO NOT generate fantasy art, cartoons, or text-heavy images.
+Return ONLY a JSON array of {n_prompts} strings, nothing else.
+
+Subject: {self.subject}"""
+
+            completion = (
+                str(self.generate_response(prompt))
+                .replace("```json", "")
+                .replace("```", "")
+                .strip()
+            )
+
+            image_prompts = []
+
+            try:
+                parsed = json.loads(completion)
+                if isinstance(parsed, list):
+                    image_prompts = [str(p) for p in parsed if p]
+                elif isinstance(parsed, dict) and "image_prompts" in parsed:
+                    image_prompts = parsed["image_prompts"]
+            except Exception:
+                r = re.compile(r"\[.*?\]", re.DOTALL)
+                match = r.search(completion)
+                if match:
+                    try:
+                        image_prompts = json.loads(match.group())
+                    except Exception:
+                        pass
+
+            if not image_prompts:
+                if _retries < 3:
+                    if get_verbose():
+                        warning("Failed to parse image prompts. Retrying...")
+                    return self.generate_prompts(_retries=_retries + 1)
+                if get_verbose():
+                    warning("Using fallback image prompts.")
+                image_prompts = [
+                    f"premium black and gold bitcoin coin floating over a glossy dark trading screen with silver reflections, cinematic crypto branding, {self.subject}",
+                    f"luxury ethereum chart dashboard with deep black background and gold signal lines, futuristic crypto analysis, {self.subject}",
+                    f"close-up of candlestick charts, bitcoin, and blockchain nodes in black gold and silver theme, premium contrast, {self.subject}",
+                    f"futuristic crypto trader desk with glowing market monitors in black, gold, and silver palette, dramatic finance lighting, {self.subject}",
+                    f"macro crypto market skyline with digital coins, circuit patterns, and gold highlights on a black background, branded premium crypto mood, {self.subject}",
+                ]
+
+            image_prompts = image_prompts[:n_prompts]
+            self.image_prompts = image_prompts
+
+            if get_verbose():
+                info(f" => Generated Image Prompts: {image_prompts}")
+            success(f"Generated {len(image_prompts)} Image Prompts.")
+
+            return image_prompts
+
         if self._is_finance_channel():
             prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about financial markets.
 Each image must feel modern, premium, and scroll-stopping, showing the energy of stocks, forex, crypto, charts, trading floors, glowing tickers, global money flows, and macro movement.
@@ -813,9 +1002,14 @@ Subject: {self.subject}"""
         return out_path
 
     def _build_subtitle_generator(self):
-        subtitle_color = "#FFFFFF" if self._is_finance_channel() else "#FFFF00"
-        subtitle_stroke = 7 if self._is_finance_channel() else 5
-        subtitle_fontsize = 92 if self._is_finance_channel() else 100
+        if self._is_cryptohub_channel():
+            subtitle_color = "#FFD54A"
+            subtitle_stroke = 6
+            subtitle_fontsize = 88
+        else:
+            subtitle_color = "#FFFFFF" if self._is_finance_channel() else "#FFFF00"
+            subtitle_stroke = 7 if self._is_finance_channel() else 5
+            subtitle_fontsize = 92 if self._is_finance_channel() else 100
 
         return lambda txt: TextClip(
             txt,
@@ -848,8 +1042,8 @@ Subject: {self.subject}"""
             TextClip(
                 headline,
                 font=os.path.join(get_fonts_dir(), get_font()),
-                fontsize=74,
-                color="#FFFFFF",
+                fontsize=70 if self._is_cryptohub_channel() else 74,
+                color="#FFD54A" if self._is_cryptohub_channel() else "#FFFFFF",
                 stroke_color="black",
                 stroke_width=3,
                 bg_color="#000000",
@@ -862,6 +1056,25 @@ Subject: {self.subject}"""
             .set_duration(duration)
             .crossfadein(0.2)
         )
+
+    def _build_brand_logo_clip(self, duration: float):
+        logo_path = self._get_brand_logo_path()
+        if not logo_path:
+            return None
+        try:
+            clip = (
+                ImageClip(logo_path)
+                .set_duration(duration)
+                .resize(width=260)
+                .set_opacity(0.95)
+                .set_position(("right", "bottom"))
+                .margin(right=36, bottom=52, opacity=0)
+            )
+            return clip
+        except Exception as exc:
+            if get_verbose():
+                warning(f"Failed to add brand logo overlay: {exc}")
+            return None
 
     def _persist_image(self, image_bytes: bytes, provider_label: str) -> str:
         """
@@ -1217,7 +1430,10 @@ Subject: {self.subject}"""
                     )
                 clip = clip.resize((1080, 1920))
 
-                if self._is_finance_channel():
+                if self._is_cryptohub_channel():
+                    clip = clip.fx(vfx.lum_contrast, lum=-6, contrast=22, contrast_thr=118)
+                    clip = clip.fadein(0.12).fadeout(0.12)
+                elif self._is_finance_channel():
                     clip = clip.fx(vfx.blackwhite)
                     clip = clip.fx(vfx.lum_contrast, lum=0, contrast=28, contrast_thr=110)
                     clip = clip.fadein(0.15).fadeout(0.15)
@@ -1258,11 +1474,20 @@ Subject: {self.subject}"""
         if subtitles is not None:
             subtitles = subtitles.set_position(("center", "center"))
 
-        if self._is_finance_channel():
+        if self._is_finance_channel() or self._is_cryptohub_channel():
             overlays = [final_clip]
+            if self._is_cryptohub_channel():
+                overlays.append(
+                    ColorClip(size=(1080, 1920), color=(0, 0, 0))
+                    .set_opacity(0.12)
+                    .set_duration(tts_clip.duration)
+                )
             headline_clip = self._build_finance_headline_clip(tts_clip.duration)
             if headline_clip is not None:
                 overlays.append(headline_clip)
+            brand_logo = self._build_brand_logo_clip(tts_clip.duration)
+            if brand_logo is not None:
+                overlays.append(brand_logo)
             if subtitles is not None:
                 overlays.append(subtitles)
             final_clip = CompositeVideoClip(overlays, size=(1080, 1920))
