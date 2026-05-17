@@ -115,6 +115,20 @@ class YouTube:
             or "cryptohub" in niche
         )
 
+    def _is_onxy_channel(self) -> bool:
+        nickname = (self._account_nickname or "").lower()
+        account_uuid = (self._account_uuid or "").lower()
+        niche = (self.niche or "").lower()
+        return (
+            "onxy" in nickname
+            or "onxy" in account_uuid
+            or "($ox)" in nickname
+            or "($ox)" in account_uuid
+            or "crypto flex" in niche
+            or "crypto attitude" in niche
+            or "onxy" in niche
+        )
+
     def _is_luxury_channel(self) -> bool:
         nickname = (self._account_nickname or "").lower()
         account_uuid = (self._account_uuid or "").lower()
@@ -148,6 +162,8 @@ class YouTube:
         nickname = (self._account_nickname or "").lower()
         account_uuid = (self._account_uuid or "").lower()
         return (
+            self._is_onxy_channel()
+            or
             self._is_cryptohub_channel()
             or self._is_psychology_channel()
             or self._is_manifestation_channel()
@@ -228,6 +244,27 @@ Use formats like:
 Rules:
 - Focus only on luxury, wealth, elite lifestyle, rich habits, expensive experiences, and high-end symbols
 - Make it aspirational, curiosity-driven, and broad-audience friendly
+- Return ONLY the video topic as one sentence
+- No emojis, no numbering, nothing else"""
+            )
+            if not completion:
+                error("Failed to generate Topic.")
+            self.subject = completion
+            return completion
+        if self._is_onxy_channel():
+            completion = self.generate_response(
+                f"""Generate a compelling YouTube Shorts topic about: {self.niche}
+Style: black-theme crypto flex content with attitude, confidence, dominance, conviction, token culture, alpha energy, and cool money moves.
+Use formats like:
+- "The Crypto Mindset Weak Hands Never Learn"
+- "Why Smart Money Moves In Silence"
+- "This Token Energy Changes Everything"
+- "The Alpha Rule Behind Real Crypto Conviction"
+- "What Crypto Winners Never Explain"
+- "How Flex And Conviction Build Real Status"
+Rules:
+- Focus only on crypto, token culture, flex, confidence, conviction, money attitude, charts, market moves, and alpha mentality
+- Make it sharp, dark, stylish, and broad-audience friendly
 - Return ONLY the video topic as one sentence
 - No emojis, no numbering, nothing else"""
             )
@@ -360,6 +397,38 @@ Rules:
 - Spoken words only
 - No hard selling, no financial promises
 - Keep it clean, luxurious, and broad-audience friendly
+- Language: {self.language}
+
+Subject: {self.subject}"""
+            completion = self.generate_response(prompt)
+            completion = re.sub(r"\*", "", completion)
+            if not completion:
+                error("The generated script is empty.")
+                return
+            if len(completion) > 5000:
+                if get_verbose():
+                    warning("Generated Script is too long. Retrying...")
+                return self.generate_script()
+            self.script = completion
+            return completion
+        if self._is_onxy_channel():
+            prompt = f"""You are the writer for ONXY($OX), a black-theme crypto attitude YouTube Shorts channel.
+Write a script of exactly {sentence_length} sentences about the subject below.
+
+Tone:
+- Dark, confident, stylish, and high-status
+- Feels like crypto conviction mixed with flex and sharp attitude
+- FIRST SENTENCE must instantly hit with a cold truth, alpha mindset, or crypto flex angle
+- Keep every sentence short, punchy, and easy to read on screen
+- Focus on tokens, conviction, market psychology, smart money, confidence, timing, silence, and dominance
+- End with a strong final line that feels quotable
+
+Rules:
+- Exactly {sentence_length} sentences
+- NO markdown, NO titles, NO bullet points
+- NO filler like "in this video"
+- No voiceover language, just clean text-friendly lines
+- Broad audience friendly, stylish, and not scammy
 - Language: {self.language}
 
 Subject: {self.subject}"""
@@ -694,6 +763,73 @@ Subject: {self.subject}"""
                 f"{subject_line}\n\n"
                 f"{summary_line}\n\n"
                 "#Shorts #LuxuryLifestyle #RichLife #BillionaireLifestyle #OldMoney"
+            )
+
+            self.metadata = {"title": title, "description": description, "tags": tags}
+            return self.metadata
+        if self._is_onxy_channel():
+            title = self.generate_response(
+                f"""Generate a YouTube Shorts title for the following subject.
+Style: black-theme crypto flex channel focused on tokens, conviction, smart money, confidence, crypto attitude, and alpha energy.
+Use formats like:
+"The Crypto Rule Weak Hands Ignore", "Smart Money Moves Like This", "The Alpha Token Mindset", "Why Conviction Looks Different"
+Include 2-3 hashtags like #Crypto #Token #Mindset
+SEO:
+- naturally include one searchable keyword like crypto, token, smart money, market psychology, bitcoin, altcoins, or trading mindset
+- make it curiosity-driven, stylish, and broad-audience friendly
+Only return the title. Under 100 characters.
+Subject: {self.subject}"""
+            )
+
+            if len(title) > 100:
+                if get_verbose():
+                    warning("Generated Title is too long. Retrying...")
+                return self.generate_metadata()
+
+            description = self.generate_response(
+                f"Please generate a YouTube Video Description for the following script: {self.script}. "
+                f"Tone: stylish, dark, confident, crypto-native, and broad-audience friendly. No markdown. "
+                f"Only return the description, nothing else."
+            )
+
+            tags_response = self.generate_response(
+                f"Generate 10-15 relevant YouTube tags for a video about: {self.subject}. "
+                f"Return ONLY a comma-separated list of tags, nothing else. "
+                f"Tags should be short, search-friendly, and relevant to crypto, token culture, smart money, market psychology, altcoins, attitude, flex, conviction, and trading mindset."
+            )
+
+            tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+            broad_tags = [
+                "crypto",
+                "token",
+                "smart money",
+                "crypto mindset",
+                "market psychology",
+                "altcoins",
+                "bitcoin",
+                "trading mindset",
+                "crypto attitude",
+                "alpha mindset",
+                "conviction",
+                "money mindset",
+                "crypto flex",
+                "black theme",
+                "shorts",
+            ]
+            for tag in broad_tags:
+                if tag.lower() not in {t.lower() for t in tags}:
+                    tags.append(tag)
+            tags = tags[:15]
+
+            subject_line = self._sanitize_youtube_text(self.subject, limit=120, multiline=False)
+            summary_line = self._sanitize_youtube_text(description, limit=220, multiline=False)
+            if not summary_line:
+                summary_line = "Black-theme crypto content about tokens, conviction, smart money, and confident market attitude."
+
+            description = (
+                f"{subject_line}\n\n"
+                f"{summary_line}\n\n"
+                "#Shorts #Crypto #Token #SmartMoney #Mindset"
             )
 
             self.metadata = {"title": title, "description": description, "tags": tags}
@@ -1046,6 +1182,63 @@ Subject: {self.subject}"""
 
             return image_prompts
 
+        if self._is_onxy_channel():
+            prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about crypto token flex and attitude.
+Each image must feel dark, premium, powerful, and stylish, showing black screens, glowing token symbols, chart silhouettes, luxury minimalism, crypto confidence, smart money energy, and elite digital wealth mood.
+Style: strict black theme, monochrome black layers, graphite, subtle silver highlights, faint white glow, deep shadows, dramatic contrast, clean premium composition.
+DO NOT generate fantasy art, cartoons, or text-heavy images.
+Return ONLY a JSON array of {n_prompts} strings, nothing else.
+
+Subject: {self.subject}"""
+
+            completion = (
+                str(self.generate_response(prompt))
+                .replace("```json", "")
+                .replace("```", "")
+                .strip()
+            )
+
+            image_prompts = []
+
+            try:
+                parsed = json.loads(completion)
+                if isinstance(parsed, list):
+                    image_prompts = [str(p) for p in parsed if p]
+                elif isinstance(parsed, dict) and "image_prompts" in parsed:
+                    image_prompts = parsed["image_prompts"]
+            except Exception:
+                r = re.compile(r"\[.*?\]", re.DOTALL)
+                match = r.search(completion)
+                if match:
+                    try:
+                        image_prompts = json.loads(match.group())
+                    except Exception:
+                        pass
+
+            if not image_prompts:
+                if _retries < 3:
+                    if get_verbose():
+                        warning("Failed to parse image prompts. Retrying...")
+                    return self.generate_prompts(_retries=_retries + 1)
+                if get_verbose():
+                    warning("Using fallback image prompts.")
+                image_prompts = [
+                    f"pure black crypto trading screen with subtle token glow and dramatic silver highlights, attitude-driven premium mood, {self.subject}",
+                    f"dark silhouette of a confident trader facing black market screens with minimal white chart lines, cinematic crypto flex, {self.subject}",
+                    f"black luxury desk with token coin, cold white reflections, and smart money energy, premium crypto attitude, {self.subject}",
+                    f"deep black city skyline with faint crypto chart overlays and dominant market mood, sleek monochrome style, {self.subject}",
+                    f"minimal black background with bold token symbol glow, alpha crypto aesthetic, dramatic shadow and contrast, {self.subject}",
+                ]
+
+            image_prompts = image_prompts[:n_prompts]
+            self.image_prompts = image_prompts
+
+            if get_verbose():
+                info(f" => Generated Image Prompts: {image_prompts}")
+            success(f"Generated {len(image_prompts)} Image Prompts.")
+
+            return image_prompts
+
         if self._is_cryptohub_channel():
             prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about crypto markets.
 Each image must feel premium, futuristic, and branded for a black, gold, and silver crypto channel, showing bitcoin, ethereum, candlestick charts, blockchain signals, digital market dashboards, and high-end macro tension.
@@ -1259,6 +1452,45 @@ Subject: {self.subject}"""
             info(f"Generated finance ambient music: {out_path}")
         return out_path
 
+    def _generate_onxy_music(self, duration: float) -> str:
+        out_path = os.path.join(ROOT_DIR, ".mp", f"onxy_ambient_{uuid4().hex[:6]}.wav")
+        expr = (
+            "(0.18*sin(2*PI*46.25*t)"
+            "+0.12*sin(2*PI*92.50*t)"
+            "+0.08*sin(2*PI*138.59*t)"
+            "+0.06*sin(2*PI*185.00*t)"
+            "+0.04*sin(2*PI*370.00*t)*(0.35+0.65*sin(2*PI*3.2*t))"
+            "+0.02*sin(2*PI*740.00*t)*(0.25+0.75*sin(2*PI*6.4*t)))"
+            "*(0.78+0.22*sin(2*PI*0.42*t))"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"aevalsrc={expr}:s=22050:d={int(duration) + 2}",
+            "-af",
+            (
+                "highpass=f=38,"
+                "lowpass=f=4600,"
+                "acompressor=threshold=-17dB:ratio=3.2:attack=12:release=140,"
+                "aecho=0.74:0.66:38:0.14,"
+                "treble=g=3:f=2500:w=0.7,"
+                "afade=t=in:st=0:d=0.6,"
+                f"afade=t=out:st={max(0, int(duration) - 1)}:d=2"
+            ),
+            out_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            if get_verbose():
+                warning(
+                    "ONXY ambient music generation failed: "
+                    f"{result.stderr.decode(errors='ignore')[:300]}"
+                )
+            return ""
+        if get_verbose():
+            info(f"Generated ONXY ambient music: {out_path}")
+        return out_path
+
     def _generate_psychology_music(self, duration: float) -> str:
         out_path = os.path.join(ROOT_DIR, ".mp", f"psychology_ambient_{uuid4().hex[:6]}.wav")
         expr = (
@@ -1370,7 +1602,11 @@ Subject: {self.subject}"""
         return out_path
 
     def _build_subtitle_generator(self):
-        if self._is_cryptohub_channel():
+        if self._is_onxy_channel():
+            subtitle_color = "#FFFFFF"
+            subtitle_stroke = 4
+            subtitle_fontsize = 82
+        elif self._is_cryptohub_channel():
             subtitle_color = "#FFD54A"
             subtitle_stroke = 6
             subtitle_fontsize = 88
@@ -1411,7 +1647,7 @@ Subject: {self.subject}"""
                 headline,
                 font=os.path.join(get_fonts_dir(), get_font()),
                 fontsize=70 if self._is_cryptohub_channel() else 74,
-                color="#FFD54A" if self._is_cryptohub_channel() else "#FFFFFF",
+                color="#FFFFFF" if self._is_onxy_channel() else ("#FFD54A" if self._is_cryptohub_channel() else "#FFFFFF"),
                 stroke_color="black",
                 stroke_width=3,
                 bg_color="#000000",
@@ -1470,17 +1706,17 @@ Subject: {self.subject}"""
         clips = []
 
         for idx, segment in enumerate(segments):
-            color = "#FFD54A" if self._is_cryptohub_channel() else "#FFFFFF"
-            bg_color = "#000000" if self._is_cryptohub_channel() else None
+            color = "#FFFFFF" if self._is_onxy_channel() else ("#FFD54A" if self._is_cryptohub_channel() else "#FFFFFF")
+            bg_color = "#000000" if (self._is_cryptohub_channel() or self._is_onxy_channel()) else None
             clip = (
                 TextClip(
-                    segment.upper() if self._is_cryptohub_channel() else segment,
+                    segment.upper() if (self._is_cryptohub_channel() or self._is_onxy_channel()) else segment,
                     font=os.path.join(get_fonts_dir(), get_font()),
-                    fontsize=84 if self._is_cryptohub_channel() else 88,
+                    fontsize=80 if self._is_onxy_channel() else (84 if self._is_cryptohub_channel() else 88),
                     color=color,
                     stroke_color="black",
-                    stroke_width=5,
-                    kerning=1 if self._is_cryptohub_channel() else 0,
+                    stroke_width=4 if self._is_onxy_channel() else 5,
+                    kerning=2 if self._is_onxy_channel() else (1 if self._is_cryptohub_channel() else 0),
                     bg_color=bg_color,
                     size=(940, 320),
                     align="center",
@@ -1488,7 +1724,7 @@ Subject: {self.subject}"""
                 )
                 .set_start(idx * per_segment)
                 .set_duration(per_segment + 0.15)
-                .set_position(("center", 1290 if self._is_cryptohub_channel() else 1230))
+                .set_position(("center", 1260 if self._is_onxy_channel() else (1290 if self._is_cryptohub_channel() else 1230)))
                 .crossfadein(0.12)
             )
             clips.append(clip)
@@ -1850,7 +2086,11 @@ Subject: {self.subject}"""
                     )
                 clip = clip.resize((1080, 1920))
 
-                if self._is_cryptohub_channel():
+                if self._is_onxy_channel():
+                    clip = clip.fx(vfx.blackwhite)
+                    clip = clip.fx(vfx.lum_contrast, lum=-26, contrast=34, contrast_thr=118)
+                    clip = clip.fadein(0.12).fadeout(0.12)
+                elif self._is_cryptohub_channel():
                     clip = clip.fx(vfx.lum_contrast, lum=-6, contrast=22, contrast_thr=118)
                     clip = clip.fadein(0.12).fadeout(0.12)
                 elif self._is_finance_channel():
@@ -1869,7 +2109,9 @@ Subject: {self.subject}"""
         random_song = choose_random_song()
         generated_music = ""
         if not random_song:
-            if self._is_luxury_channel():
+            if self._is_onxy_channel():
+                generated_music = self._generate_onxy_music(max_duration)
+            elif self._is_luxury_channel():
                 generated_music = self._generate_luxury_music(max_duration)
             elif self._is_cryptohub_channel() or self._is_finance_channel():
                 generated_music = self._generate_finance_music(max_duration)
@@ -1912,9 +2154,15 @@ Subject: {self.subject}"""
         if subtitles is not None:
             subtitles = subtitles.set_position(("center", "center"))
 
-        if self._is_finance_channel() or self._is_cryptohub_channel():
+        if self._is_finance_channel() or self._is_cryptohub_channel() or self._is_onxy_channel():
             overlays = [final_clip]
-            if self._is_cryptohub_channel():
+            if self._is_onxy_channel():
+                overlays.append(
+                    ColorClip(size=(1080, 1920), color=(0, 0, 0))
+                    .set_opacity(0.88)
+                    .set_duration(max_duration)
+                )
+            elif self._is_cryptohub_channel():
                 overlays.append(
                     ColorClip(size=(1080, 1920), color=(0, 0, 0))
                     .set_opacity(0.12)
