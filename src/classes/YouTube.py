@@ -115,6 +115,28 @@ class YouTube:
             or "cryptohub" in niche
         )
 
+    def _is_luxury_channel(self) -> bool:
+        nickname = (self._account_nickname or "").lower()
+        account_uuid = (self._account_uuid or "").lower()
+        niche = (self.niche or "").lower()
+        luxury_terms = [
+            "luxury",
+            "rich lifestyle",
+            "richlifesytles",
+            "rich lifestyle",
+            "wealth",
+            "billionaire",
+            "supercar",
+            "private jet",
+            "mansion",
+            "old money",
+        ]
+        return (
+            "billionaireparadise" in nickname
+            or "billionaireparadise" in account_uuid
+            or any(term in niche for term in luxury_terms)
+        )
+
     def _get_brand_logo_path(self) -> str:
         if self._is_cryptohub_channel():
             logo_path = os.path.join(ROOT_DIR, "assets", "channel_branding", "cryptohub_logo.png")
@@ -129,6 +151,7 @@ class YouTube:
             self._is_cryptohub_channel()
             or self._is_psychology_channel()
             or self._is_manifestation_channel()
+            or self._is_luxury_channel()
             or "moneymarkettt" in nickname
             or "moneymarkettt" in account_uuid
         )
@@ -185,6 +208,28 @@ Use formats like:
 - "The Dark Side Of People Pleasing"
 - "Why Some People Only Value You After Losing You"
 Return ONLY the video topic as one sentence. Nothing else."""
+            )
+            if not completion:
+                error("Failed to generate Topic.")
+            self.subject = completion
+            return completion
+        if self._is_luxury_channel():
+            completion = self.generate_response(
+                f"""Generate a compelling YouTube Shorts topic about: {self.niche}
+Style: ultra-luxury, billionaire lifestyle, expensive taste, private jets, supercars, mansions, elite routines, old money signals, luxury travel, and rich lifestyle psychology.
+Use formats like:
+- "The Luxury Detail Rich People Never Ignore"
+- "Inside A Billionaire Morning Routine"
+- "The Supercar Habit That Signals Real Wealth"
+- "What Private Jet Travel Really Looks Like"
+- "The Mansion Feature Only The Ultra Rich Buy"
+- "The Old Money Rule Most People Miss"
+- "How The Rich Design A Luxury Life"
+Rules:
+- Focus only on luxury, wealth, elite lifestyle, rich habits, expensive experiences, and high-end symbols
+- Make it aspirational, curiosity-driven, and broad-audience friendly
+- Return ONLY the video topic as one sentence
+- No emojis, no numbering, nothing else"""
             )
             if not completion:
                 error("Failed to generate Topic.")
@@ -282,6 +327,39 @@ Rules:
 - Spoken words only
 - Use YOU and PEOPLE naturally
 - Stay grounded in psychology, behavior, emotional patterns, and dark truths
+- Language: {self.language}
+
+Subject: {self.subject}"""
+            completion = self.generate_response(prompt)
+            completion = re.sub(r"\*", "", completion)
+            if not completion:
+                error("The generated script is empty.")
+                return
+            if len(completion) > 5000:
+                if get_verbose():
+                    warning("Generated Script is too long. Retrying...")
+                return self.generate_script()
+            self.script = completion
+            return completion
+        if self._is_luxury_channel():
+            prompt = f"""You are a luxury lifestyle storyteller creating a viral YouTube Short.
+Write a script of exactly {sentence_length} sentences about the subject below.
+
+Tone:
+- Premium, cinematic, and aspirational
+- Sounds like exclusive insider knowledge about rich lifestyles
+- FIRST SENTENCE must stop attention with a luxury detail or wealth truth
+- Keep each sentence short, visual, and easy to read on screen
+- Focus on billionaires, luxury travel, supercars, mansions, old money habits, expensive routines, and elite aesthetics
+- End with a strong rich-lifestyle insight that makes the viewer want more
+
+Rules:
+- Exactly {sentence_length} sentences
+- NO markdown, NO titles, NO bullet points
+- NO filler like "in this video"
+- Spoken words only
+- No hard selling, no financial promises
+- Keep it clean, luxurious, and broad-audience friendly
 - Language: {self.language}
 
 Subject: {self.subject}"""
@@ -549,6 +627,73 @@ Subject: {self.subject}"""
                 f"{subject_line}\n\n"
                 f"{summary_line}\n\n"
                 "#Shorts #Psychology #HumanBehavior #DarkPsychology #RelationshipAdvice"
+            )
+
+            self.metadata = {"title": title, "description": description, "tags": tags}
+            return self.metadata
+        if self._is_luxury_channel():
+            title = self.generate_response(
+                f"""Generate a YouTube Shorts title for the following subject.
+Style: billionaire lifestyle channel focused on luxury, rich routines, expensive taste, private jets, supercars, mansions, and old money energy.
+Use formats like:
+"The Luxury Detail Rich People Notice", "Inside A Billionaire Routine", "The Rich Lifestyle Rule Most Miss", "What Ultra Luxury Looks Like"
+Include 2-3 hashtags like #LuxuryLifestyle #RichLife #BillionaireMindset
+SEO:
+- naturally include one searchable keyword like luxury lifestyle, rich lifestyle, billionaire lifestyle, supercars, private jet, mansion, or old money
+- make it broad-audience friendly and curiosity-driven
+Only return the title. Under 100 characters.
+Subject: {self.subject}"""
+            )
+
+            if len(title) > 100:
+                if get_verbose():
+                    warning("Generated Title is too long. Retrying...")
+                return self.generate_metadata()
+
+            description = self.generate_response(
+                f"Please generate a YouTube Video Description for the following script: {self.script}. "
+                f"Tone: premium, aspirational, elegant, and broad-audience friendly. No hype. No markdown. "
+                f"Only return the description, nothing else."
+            )
+
+            tags_response = self.generate_response(
+                f"Generate 10-15 relevant YouTube tags for a video about: {self.subject}. "
+                f"Return ONLY a comma-separated list of tags, nothing else. "
+                f"Tags should be short, search-friendly, and relevant to luxury lifestyle, billionaire lifestyle, rich habits, old money, luxury travel, supercars, mansions, and elite living."
+            )
+
+            tags = [tag.strip() for tag in tags_response.split(',') if tag.strip()]
+            broad_tags = [
+                "luxury lifestyle",
+                "rich lifestyle",
+                "billionaire lifestyle",
+                "old money",
+                "luxury travel",
+                "private jet",
+                "supercars",
+                "mansion tour",
+                "rich habits",
+                "elite lifestyle",
+                "wealth mindset",
+                "expensive lifestyle",
+                "luxury aesthetics",
+                "millionaire lifestyle",
+                "shorts",
+            ]
+            for tag in broad_tags:
+                if tag.lower() not in {t.lower() for t in tags}:
+                    tags.append(tag)
+            tags = tags[:15]
+
+            subject_line = self._sanitize_youtube_text(self.subject, limit=120, multiline=False)
+            summary_line = self._sanitize_youtube_text(description, limit=220, multiline=False)
+            if not summary_line:
+                summary_line = "Luxury lifestyle content about billionaire routines, supercars, private jets, mansions, and rich living."
+
+            description = (
+                f"{subject_line}\n\n"
+                f"{summary_line}\n\n"
+                "#Shorts #LuxuryLifestyle #RichLife #BillionaireLifestyle #OldMoney"
             )
 
             self.metadata = {"title": title, "description": description, "tags": tags}
@@ -844,6 +989,63 @@ Subject: {self.subject}"""
             success(f"Generated {len(image_prompts)} Image Prompts.")
             return image_prompts
 
+        if self._is_luxury_channel():
+            prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about luxury lifestyle.
+Each image must feel ultra-premium, aspirational, glossy, and expensive, showing billionaire homes, private jets, supercars, yachts, luxury hotel suites, designer fashion details, skyline penthouses, elite travel, and rich lifestyle rituals.
+Style: cinematic luxury visuals, black, champagne gold, silver, marble, warm ambient lighting, glossy surfaces, dramatic elegance, and premium composition.
+DO NOT generate fantasy art, cartoons, or text-heavy images.
+Return ONLY a JSON array of {n_prompts} strings, nothing else.
+
+Subject: {self.subject}"""
+
+            completion = (
+                str(self.generate_response(prompt))
+                .replace("```json", "")
+                .replace("```", "")
+                .strip()
+            )
+
+            image_prompts = []
+
+            try:
+                parsed = json.loads(completion)
+                if isinstance(parsed, list):
+                    image_prompts = [str(p) for p in parsed if p]
+                elif isinstance(parsed, dict) and "image_prompts" in parsed:
+                    image_prompts = parsed["image_prompts"]
+            except Exception:
+                r = re.compile(r"\[.*?\]", re.DOTALL)
+                match = r.search(completion)
+                if match:
+                    try:
+                        image_prompts = json.loads(match.group())
+                    except Exception:
+                        pass
+
+            if not image_prompts:
+                if _retries < 3:
+                    if get_verbose():
+                        warning("Failed to parse image prompts. Retrying...")
+                    return self.generate_prompts(_retries=_retries + 1)
+                if get_verbose():
+                    warning("Using fallback image prompts.")
+                image_prompts = [
+                    f"luxury private jet interior with champagne gold lighting and glossy black finishes, rich lifestyle aesthetic, {self.subject}",
+                    f"ultra premium supercar parked in front of a modern mansion at dusk, cinematic luxury mood, {self.subject}",
+                    f"billionaire penthouse skyline view with marble, gold accents, and elite lifestyle styling, {self.subject}",
+                    f"luxury yacht deck at sunset with expensive details, elegant travel energy, {self.subject}",
+                    f"close-up of designer watch, luxury keys, and black card on marble table, wealthy lifestyle symbolism, {self.subject}",
+                ]
+
+            image_prompts = image_prompts[:n_prompts]
+            self.image_prompts = image_prompts
+
+            if get_verbose():
+                info(f" => Generated Image Prompts: {image_prompts}")
+            success(f"Generated {len(image_prompts)} Image Prompts.")
+
+            return image_prompts
+
         if self._is_cryptohub_channel():
             prompt = f"""Generate exactly {n_prompts} cinematic image prompts for a YouTube Short about crypto markets.
 Each image must feel premium, futuristic, and branded for a black, gold, and silver crypto channel, showing bitcoin, ethereum, candlestick charts, blockchain signals, digital market dashboards, and high-end macro tension.
@@ -1127,6 +1329,44 @@ Subject: {self.subject}"""
             return ""
         if get_verbose():
             info(f"Generated manifestation ambient music: {out_path}")
+        return out_path
+
+    def _generate_luxury_music(self, duration: float) -> str:
+        out_path = os.path.join(ROOT_DIR, ".mp", f"luxury_ambient_{uuid4().hex[:6]}.wav")
+        expr = (
+            "(0.14*sin(2*PI*65.41*t)"
+            "+0.10*sin(2*PI*130.81*t)"
+            "+0.07*sin(2*PI*196.00*t)"
+            "+0.05*sin(2*PI*261.63*t)"
+            "+0.03*sin(2*PI*392.00*t)*(0.4+0.6*sin(2*PI*2.6*t)))"
+            "*(0.74+0.26*sin(2*PI*0.36*t))"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"aevalsrc={expr}:s=22050:d={int(duration) + 2}",
+            "-af",
+            (
+                "highpass=f=35,"
+                "lowpass=f=5200,"
+                "acompressor=threshold=-18dB:ratio=2.8:attack=18:release=160,"
+                "aecho=0.76:0.68:46:0.16,"
+                "treble=g=5:f=3200:w=0.7,"
+                "afade=t=in:st=0:d=0.7,"
+                f"afade=t=out:st={max(0, int(duration) - 1)}:d=2"
+            ),
+            out_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            if get_verbose():
+                warning(
+                    "Luxury ambient music generation failed: "
+                    f"{result.stderr.decode(errors='ignore')[:300]}"
+                )
+            return ""
+        if get_verbose():
+            info(f"Generated luxury ambient music: {out_path}")
         return out_path
 
     def _build_subtitle_generator(self):
@@ -1629,7 +1869,9 @@ Subject: {self.subject}"""
         random_song = choose_random_song()
         generated_music = ""
         if not random_song:
-            if self._is_cryptohub_channel() or self._is_finance_channel():
+            if self._is_luxury_channel():
+                generated_music = self._generate_luxury_music(max_duration)
+            elif self._is_cryptohub_channel() or self._is_finance_channel():
                 generated_music = self._generate_finance_music(max_duration)
             elif self._is_psychology_channel():
                 generated_music = self._generate_psychology_music(max_duration)

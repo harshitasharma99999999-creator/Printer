@@ -5,6 +5,7 @@ import json
 import uuid
 import base64
 import requests
+import textwrap
 
 from io import BytesIO
 from uuid import uuid4
@@ -33,6 +34,7 @@ LONG_FORM_NICHES = [
     "law of seduction",
     "stoicism and philosophy",
     "law of attraction",
+    "luxury lifestyle and billionaire aesthetics",
 ]
 
 
@@ -71,11 +73,53 @@ class LongForm:
         niche = (self.niche or "").lower()
         return "psychology" in niche or "behavior" in niche or "dark truth" in niche
 
+    def _is_luxury_channel(self) -> bool:
+        niche = (self.niche or "").lower()
+        nickname = (self.account_nickname or "").lower()
+        account_uuid = (self.account_uuid or "").lower()
+        luxury_terms = [
+            "luxury",
+            "rich lifestyle",
+            "richlifesytles",
+            "wealth",
+            "billionaire",
+            "supercar",
+            "private jet",
+            "mansion",
+            "old money",
+            "yacht",
+            "elite",
+        ]
+        return (
+            "billionaireparadise" in nickname
+            or "billionaireparadise" in account_uuid
+            or any(term in niche for term in luxury_terms)
+        )
+
     # ------------------------------------------------------------------
     # Step 1: Topic
     # ------------------------------------------------------------------
 
     def generate_topic(self) -> str:
+        if self._is_luxury_channel():
+            prompt = (
+                f"Generate ONE compelling YouTube long-form video topic about {self.niche}.\n"
+                f"Style: ultra-luxury, billionaire lifestyle, old money aesthetics, elite routines, private jets, mansions, yachts, supercars, wealth mindset, premium travel, and expensive habits.\n"
+                f"The topic must feel aspirational, visually rich, and highly clickable for a luxury lifestyle audience.\n"
+                f"Examples:\n"
+                f"'Inside The Daily Routine Of Ultra Rich People'\n"
+                f"'Luxury Habits That Quietly Signal Real Wealth'\n"
+                f"'What Billionaire Travel Really Looks Like'\n"
+                f"'The Mansion Details Rich People Always Notice'\n"
+                f"'Old Money Rules That Make Luxury Look Effortless'\n"
+                f"Return ONLY the topic, nothing else."
+            )
+            raw = generate_text(prompt).strip()
+            self.subject = next(
+                (l.strip().strip('"').strip("'") for l in raw.splitlines() if l.strip()),
+                raw.split(".")[0].strip()
+            )
+            return self.subject
         if self._is_psychology_channel():
             prompt = (
                 f"Generate ONE compelling long-form YouTube video topic (10-15 minutes) about {self.niche}.\n"
@@ -121,6 +165,56 @@ class LongForm:
 
     def generate_script(self) -> str:
         parts = []
+        if self._is_luxury_channel():
+            hook = generate_text(
+                f"Write a 4-sentence opening for a luxury lifestyle YouTube video about: {self.subject}.\n"
+                f"Tone: premium, aspirational, visual, calm, stylish.\n"
+                f"Sentence 1 must instantly paint a rich-lifestyle image.\n"
+                f"Sentence 2 should reveal a hidden luxury detail most people miss.\n"
+                f"Sentence 3 should make the viewer imagine stepping into that world.\n"
+                f"Sentence 4 should promise a deeper look into billionaire-level living.\n"
+                f"Language: {self.language}. No markdown. Spoken-style lines only."
+            ).strip()
+            parts.append(hook)
+
+            outline_raw = generate_text(
+                f"List exactly 6 section titles for a luxury lifestyle YouTube video about: {self.subject}.\n"
+                f"Style: billionaire routines, private jets, supercars, mansions, designer details, luxury travel, old money codes, premium habits.\n"
+                f"Format: numbered list 1-6. No explanations."
+            ).strip()
+            section_titles = []
+            for line in outline_raw.splitlines():
+                m = re.match(r"^\d+[\.\)]\s*(.+)", line.strip())
+                if m:
+                    section_titles.append(m.group(1).strip())
+            if len(section_titles) < 6:
+                section_titles = [
+                    "The First Luxury Detail People Notice",
+                    "Inside The Billionaire Travel Experience",
+                    "Why Mansions Feel Different From Normal Homes",
+                    "The Quiet Signals Of Old Money Taste",
+                    "How Supercars Shape The Luxury Aesthetic",
+                    "What Makes Rich Life Feel So Addictive",
+                ]
+
+            for title in section_titles[:6]:
+                section = generate_text(
+                    f"Write 6 short, highly visual sentences for the section '{title}' in a luxury lifestyle video about: {self.subject}.\n"
+                    f"Focus on expensive textures, premium spaces, elite routines, luxury travel, designer details, supercars, mansions, yachts, and aspirational imagery.\n"
+                    f"Keep each sentence concise and easy to read on screen. Language: {self.language}. No markdown."
+                ).strip()
+                parts.append(section)
+
+            cta = generate_text(
+                f"Write a 3-sentence closing for a luxury lifestyle YouTube video about: {self.subject}.\n"
+                f"Ask viewers to like, comment their dream luxury experience, and subscribe for more billionaire lifestyle content.\n"
+                f"Tone: premium, clean, aspirational. Language: {self.language}. Spoken words only."
+            ).strip()
+            parts.append(cta)
+
+            raw = "\n\n".join(p for p in parts if p)
+            self.script = self._clean_script(raw)
+            return self.script
         if self._is_psychology_channel():
             hook = generate_text(
                 f"Write a 4-sentence opening for a dark human psychology long-form YouTube video about: {self.subject}.\n"
@@ -283,6 +377,41 @@ class LongForm:
     # ------------------------------------------------------------------
 
     def generate_metadata(self) -> dict:
+        if self._is_luxury_channel():
+            title = generate_text(
+                f"Write a YouTube video title for: {self.subject}.\n"
+                f"Make it SEO-optimized, broad-audience friendly, luxurious, and highly clickable for people interested in rich lifestyle, billionaire lifestyle, luxury travel, supercars, mansions, and old money aesthetics.\n"
+                f"Under 70 characters. Return ONLY the title, no quotes."
+            ).strip().strip('"').strip("'")
+            if len(title) > 100:
+                title = title[:97] + "..."
+
+            description = generate_text(
+                f"Write a YouTube description for a luxury lifestyle video titled '{title}' about: {self.subject}.\n"
+                f"Include SEO keywords naturally: luxury lifestyle, billionaire lifestyle, rich life, old money, private jet, supercars, mansion, wealth habits, luxury travel.\n"
+                f"150-200 words. No markdown.\n"
+                f"End with: Subscribe for more luxury lifestyle videos."
+            ).strip()
+
+            description += "\n\n#LuxuryLifestyle #RichLife #BillionaireLifestyle #OldMoney #LuxuryTravel"
+            self.metadata = {
+                "title": title,
+                "description": description,
+                "tags": [
+                    "luxury lifestyle",
+                    "rich lifestyle",
+                    "billionaire lifestyle",
+                    "old money",
+                    "luxury travel",
+                    "private jet",
+                    "supercars",
+                    "mansion tour",
+                    "wealth habits",
+                    "elite lifestyle",
+                    "luxury video",
+                ],
+            }
+            return self.metadata
         if self._is_psychology_channel():
             title = generate_text(
                 f"Write a YouTube video title for: {self.subject}.\n"
@@ -369,6 +498,31 @@ class LongForm:
     # ------------------------------------------------------------------
 
     def generate_image_prompts(self) -> List[str]:
+        if self._is_luxury_channel():
+            raw = generate_text(
+                f"Generate 8 CINEMATIC 16:9 image prompts for a luxury lifestyle YouTube video about: {self.subject}.\n"
+                f"Style: ultra-premium, glossy black, champagne gold, silver, marble, penthouses, private jets, yachts, supercars, designer interiors, sunset city skylines, wealth aesthetics.\n"
+                f"No fantasy, no cartoons, no text in the image.\n"
+                f"Return as JSON array of 8 strings only. Example: [\"scene1\", \"scene2\"]"
+            ).strip()
+            m = re.search(r"\[.*?\]", raw, re.DOTALL)
+            if m:
+                try:
+                    prompts = json.loads(m.group(0))
+                    if isinstance(prompts, list) and prompts:
+                        return [str(p) for p in prompts[:8]]
+                except Exception:
+                    pass
+            return [
+                f"private jet interior with black leather, champagne gold lighting, cinematic luxury aesthetic, {self.subject}",
+                f"ultra premium supercar outside a modern mansion at dusk, glossy black and gold palette, {self.subject}",
+                f"billionaire penthouse skyline view with marble floors and designer furniture, {self.subject}",
+                f"luxury yacht deck at sunset with elite travel energy, polished chrome and gold details, {self.subject}",
+                f"old money wardrobe detail with luxury watch, cufflinks, black suit, elegant moody light, {self.subject}",
+                f"mansion infinity pool overlooking city lights, premium architecture, {self.subject}",
+                f"first class luxury travel lounge with designer textures and wealthy atmosphere, {self.subject}",
+                f"high end garage with exotic supercars and dramatic premium lighting, {self.subject}",
+            ]
         if self._is_psychology_channel():
             raw = generate_text(
                 f"Generate 8 CINEMATIC 16:9 image prompts for a human psychology YouTube video about: {self.subject}.\n"
@@ -495,21 +649,36 @@ class LongForm:
     # ------------------------------------------------------------------
 
     def generate_thumbnail(self) -> str:
-        thumb_text = generate_text(
-            f"Write a 4-6 word ALL CAPS YouTube thumbnail title for: {self.subject}.\n"
-            f"Make it shocking, controversial, or deeply curious.\n"
-            f"Examples: 'THE TRUTH THEY HIDE FROM YOU', 'WHAT THEY DON'T TELL YOU'\n"
-            f"Return ONLY the title."
-        ).strip().upper()
+        if self._is_luxury_channel():
+            thumb_text = generate_text(
+                f"Write a 4-6 word ALL CAPS YouTube thumbnail title for a luxury lifestyle video about: {self.subject}.\n"
+                f"Make it rich, bold, exclusive, and curiosity-driven.\n"
+                f"Examples: 'INSIDE A BILLIONAIRE LIFE', 'WHAT REAL LUXURY LOOKS LIKE', 'THE OLD MONEY CODE'\n"
+                f"Return ONLY the title."
+            ).strip().upper()
+        else:
+            thumb_text = generate_text(
+                f"Write a 4-6 word ALL CAPS YouTube thumbnail title for: {self.subject}.\n"
+                f"Make it shocking, controversial, or deeply curious.\n"
+                f"Examples: 'THE TRUTH THEY HIDE FROM YOU', 'WHAT THEY DON'T TELL YOU'\n"
+                f"Return ONLY the title."
+            ).strip().upper()
         if len(thumb_text) > 45:
             thumb_text = " ".join(thumb_text.split()[:5])
 
         # Background image
-        thumb_prompt = (
-            f"Epic dramatic YouTube thumbnail background for a video about {self.subject}. "
-            f"Dark mysterious atmosphere, cinematic quality, no text, high contrast, "
-            f"emotionally powerful, professional photography."
-        )
+        if self._is_luxury_channel():
+            thumb_prompt = (
+                f"Luxury YouTube thumbnail background for a video about {self.subject}. "
+                f"Ultra premium black and gold aesthetic, cinematic quality, glossy surfaces, "
+                f"wealth, designer interiors, supercars, mansions, no text, high contrast, elite photography."
+            )
+        else:
+            thumb_prompt = (
+                f"Epic dramatic YouTube thumbnail background for a video about {self.subject}. "
+                f"Dark mysterious atmosphere, cinematic quality, no text, high contrast, "
+                f"emotionally powerful, professional photography."
+            )
         bg_path = self._generate_image_gemini(thumb_prompt, aspect="16:9")
         if not bg_path and self.images:
             bg_path = self.images[0]
@@ -590,6 +759,86 @@ class LongForm:
             info(f"TTS written to: {path}")
         return path
 
+    def _script_sections(self) -> List[str]:
+        sections = []
+        for block in re.split(r"\n\s*\n", self.script):
+            cleaned = " ".join(line.strip() for line in block.splitlines() if line.strip())
+            if cleaned:
+                sections.append(cleaned)
+        return sections or [self.subject]
+
+    def _estimate_music_only_duration(self, sections: List[str]) -> float:
+        word_count = max(1, len(self.script.split()))
+        base_duration = max(180.0, min(420.0, word_count * 1.7))
+        return max(base_duration, len(sections) * 18.0)
+
+    def _generate_luxury_music(self, duration: float) -> str:
+        import subprocess as _sp
+
+        out_path = os.path.join(ROOT_DIR, ".mp", f"lf_luxury_ambient_{uuid4().hex[:6]}.wav")
+        expr = (
+            "0.45*sin(2*PI*82*t)"
+            "+0.22*sin(2*PI*164*t)"
+            "+0.14*sin(2*PI*246*t)"
+            "+0.08*sin(2*PI*328*t)"
+            "+0.05*sin(2*PI*492*t)"
+        )
+        _sp.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                f"aevalsrc={expr}:s=44100:d={max(20, int(duration) + 2)}",
+                "-af",
+                "lowpass=f=5000,highpass=f=40,aecho=0.7:0.8:38|76:0.22|0.14,volume=0.33",
+                out_path,
+            ],
+            check=True,
+            timeout=240,
+        )
+        return out_path
+
+    def _create_text_overlay_image(self, text: str, index: int) -> str:
+        canvas = Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(canvas)
+
+        panel_y1, panel_y2 = 720, 1040
+        draw.rounded_rectangle(
+            [(80, panel_y1), (1840, panel_y2)],
+            radius=36,
+            fill=(0, 0, 0, 170),
+            outline=(212, 175, 55, 235),
+            width=4,
+        )
+        draw.rectangle([(80, 735), (1840, 747)], fill=(212, 175, 55, 220))
+
+        font_path = os.path.join(get_fonts_dir(), get_font())
+        try:
+            title_font = ImageFont.truetype(font_path, 42)
+            body_font = ImageFont.truetype(font_path, 58)
+        except Exception:
+            title_font = ImageFont.load_default()
+            body_font = ImageFont.load_default()
+
+        draw.text((120, 765), "BILLIONAIRE PARADISE", font=title_font, fill=(255, 224, 120, 255))
+
+        wrapped = textwrap.wrap(text.upper(), width=34)[:4]
+        y = 825
+        for line in wrapped:
+            bbox = draw.textbbox((0, 0), line, font=body_font)
+            line_w = bbox[2] - bbox[0]
+            x = (1920 - line_w) // 2
+            for dx, dy in [(3, 3), (-3, 3), (3, -3), (-3, -3)]:
+                draw.text((x + dx, y + dy), line, font=body_font, fill=(0, 0, 0, 255))
+            draw.text((x, y), line, font=body_font, fill=(255, 255, 255, 255))
+            y += 68
+
+        out_path = os.path.join(ROOT_DIR, ".mp", f"lf-luxury-overlay-{index}.png")
+        canvas.save(out_path)
+        return out_path
+
     # ------------------------------------------------------------------
     # Step 8: Subtitles
     # ------------------------------------------------------------------
@@ -646,6 +895,40 @@ class LongForm:
         if not self.images:
             error("No images — cannot combine video.")
             return ""
+
+        if self._is_luxury_channel():
+            sections = self._script_sections()
+            max_duration = self._estimate_music_only_duration(sections)
+            per_section = max_duration / max(1, len(sections))
+            clips = []
+            for idx, section in enumerate(sections):
+                img_path = self.images[idx % len(self.images)]
+                base_clip = ImageClip(img_path).set_duration(per_section).set_fps(30)
+                iw, ih = base_clip.size
+                target_ratio = 1920 / 1080
+                if iw / ih > target_ratio:
+                    new_w = int(ih * target_ratio)
+                    base_clip = base_clip.crop(x1=(iw - new_w) // 2, x2=(iw + new_w) // 2)
+                else:
+                    new_h = int(iw / target_ratio)
+                    base_clip = base_clip.crop(y1=(ih - new_h) // 2, y2=(ih + new_h) // 2)
+                base_clip = base_clip.resize((1920, 1080))
+                zoomed = base_clip.resize(lambda t: 1.0 + 0.04 * (t / max(per_section, 1.0)))
+                overlay_path = self._create_text_overlay_image(section, idx)
+                overlay_clip = ImageClip(overlay_path).set_duration(per_section).set_position(("center", "center"))
+                clips.append(CompositeVideoClip([zoomed, overlay_clip], size=(1920, 1080)))
+
+            final = concatenate_videoclips(clips).set_duration(max_duration)
+            music_path = self._generate_luxury_music(max_duration)
+            music_clip = AudioFileClip(music_path).set_duration(max_duration).volumex(0.95)
+            final = final.set_audio(music_clip)
+
+            vid_path = os.path.join(ROOT_DIR, ".mp", f"lf-video-{uuid4().hex[:8]}.mp4")
+            final.write_videofile(vid_path, threads=get_threads(), fps=24, codec="libx264", preset="faster")
+            self.video_path = vid_path
+            if get_verbose():
+                success(f"Long-form luxury video saved: {vid_path}")
+            return vid_path
 
         tts_clip = AudioFileClip(self.tts_path)
         max_duration = tts_clip.duration
@@ -854,8 +1137,11 @@ class LongForm:
         info("Generating thumbnail...")
         self.generate_thumbnail()
 
-        info("Generating TTS audio...")
-        self.generate_tts()
+        if self._is_luxury_channel():
+            info("Skipping TTS for music-only luxury video...")
+        else:
+            info("Generating TTS audio...")
+            self.generate_tts()
 
         info("Combining 1920x1080 video...")
         self.combine()
