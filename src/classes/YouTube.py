@@ -77,6 +77,17 @@ class YouTube:
         niche = (self.niche or "").lower()
         return "psychology" in niche or "behavior" in niche or "dark truth" in niche
 
+    def _is_manifestation_channel(self) -> bool:
+        niche = (self.niche or "").lower()
+        nickname = (self._account_nickname or "").lower()
+        return (
+            "manifestation" in niche
+            or "law of attraction" in niche
+            or "spiritual" in niche
+            or "consciousness" in niche
+            or "universe" in nickname
+        )
+
     def _is_finance_channel(self) -> bool:
         niche = (self.niche or "").lower()
         finance_terms = [
@@ -116,6 +127,8 @@ class YouTube:
         account_uuid = (self._account_uuid or "").lower()
         return (
             self._is_cryptohub_channel()
+            or self._is_psychology_channel()
+            or self._is_manifestation_channel()
             or "moneymarkettt" in nickname
             or "moneymarkettt" in account_uuid
         )
@@ -481,6 +494,9 @@ Style: human psychology channel focused on dark truths, behavior patterns, and e
 Use formats like:
 "The Dark Truth About X", "Why People X", "What X Really Means", "The Brutal Psychology Of X"
 Include 2-3 hashtags like #Psychology #HumanBehavior #DarkPsychology
+SEO:
+- naturally include one strong searchable phrase like human psychology, dark psychology, relationships, body language, emotional intelligence, or attachment style
+- make it broad-audience friendly and curiosity-driven
 Only return the title. Under 100 characters.
 Subject: {self.subject}"""
             )
@@ -510,6 +526,10 @@ Subject: {self.subject}"""
                 "body language",
                 "emotional intelligence",
                 "relationships",
+                "relationship psychology",
+                "attachment style",
+                "female psychology",
+                "male psychology",
                 "self awareness",
                 "psychology facts",
                 "mindset",
@@ -528,7 +548,7 @@ Subject: {self.subject}"""
             description = (
                 f"{subject_line}\n\n"
                 f"{summary_line}\n\n"
-                "#Shorts #Psychology #HumanBehavior #DarkPsychology #SelfAwareness"
+                "#Shorts #Psychology #HumanBehavior #DarkPsychology #RelationshipAdvice"
             )
 
             self.metadata = {"title": title, "description": description, "tags": tags}
@@ -672,6 +692,9 @@ Subject: {self.subject}"""
 Style: Jung Thoughts channel — use formats like:
 "What X Really Becomes", "X's Uncomfortable Truth", "The Hidden Truth About X", "Why X – A Warning"
 Include 2-3 hashtags like #Psychology #JungThoughts #Spirituality
+SEO:
+- naturally include one strong searchable keyword like manifestation, law of attraction, spiritual awakening, consciousness, self concept, or reality shifting
+- make it broad-audience friendly and curiosity-driven
 Only return the title. Under 100 characters.
 Subject: {self.subject}"""
         )
@@ -704,6 +727,11 @@ Subject: {self.subject}"""
             "motivation",
             "self improvement",
             "consciousness",
+            "reality shifting",
+            "self concept",
+            "subconscious mind",
+            "affirmations",
+            "manifestation techniques",
             "healing",
             "energy",
             "shorts",
@@ -741,11 +769,11 @@ Subject: {self.subject}"""
             pass
 
         # #Shorts tag is required for YouTube to classify vertical videos as Shorts
-        broad_hashtags = "#Shorts #Manifestation #LawOfAttraction #Motivation #Mindset"
+        broad_hashtags = "#Shorts #Manifestation #LawOfAttraction #SpiritualAwakening #Mindset"
         if "#Shorts" not in description and "#shorts" not in description:
             description += f"\n\n{broad_hashtags}"
         elif "#Manifestation" not in description and "#manifestation" not in description:
-            description += "\n#Manifestation #LawOfAttraction #Motivation #Mindset"
+            description += "\n#Manifestation #LawOfAttraction #SpiritualAwakening #Mindset"
 
         self.metadata = {"title": title, "description": description, "tags": tags}
 
@@ -1027,6 +1055,78 @@ Subject: {self.subject}"""
             return ""
         if get_verbose():
             info(f"Generated finance ambient music: {out_path}")
+        return out_path
+
+    def _generate_psychology_music(self, duration: float) -> str:
+        out_path = os.path.join(ROOT_DIR, ".mp", f"psychology_ambient_{uuid4().hex[:6]}.wav")
+        expr = (
+            "(0.12*sin(2*PI*82.41*t)"
+            "+0.08*sin(2*PI*164.81*t)"
+            "+0.05*sin(2*PI*246.94*t)"
+            "+0.03*sin(2*PI*329.63*t)*(0.5+0.5*sin(2*PI*0.8*t)))"
+            "*(0.78+0.22*sin(2*PI*0.27*t))"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"aevalsrc={expr}:s=22050:d={int(duration) + 2}",
+            "-af",
+            (
+                "highpass=f=45,"
+                "lowpass=f=3600,"
+                "aecho=0.8:0.72:48:0.22,"
+                "acompressor=threshold=-20dB:ratio=2.2:attack=25:release=220,"
+                "afade=t=in:st=0:d=0.8,"
+                f"afade=t=out:st={max(0, int(duration) - 1)}:d=2"
+            ),
+            out_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            if get_verbose():
+                warning(
+                    "Psychology ambient music generation failed: "
+                    f"{result.stderr.decode(errors='ignore')[:300]}"
+                )
+            return ""
+        if get_verbose():
+            info(f"Generated psychology ambient music: {out_path}")
+        return out_path
+
+    def _generate_manifestation_music(self, duration: float) -> str:
+        out_path = os.path.join(ROOT_DIR, ".mp", f"manifestation_ambient_{uuid4().hex[:6]}.wav")
+        expr = (
+            "(0.11*sin(2*PI*174.61*t)"
+            "+0.08*sin(2*PI*261.63*t)"
+            "+0.06*sin(2*PI*392.00*t)"
+            "+0.04*sin(2*PI*523.25*t)*(0.55+0.45*sin(2*PI*0.6*t)))"
+            "*(0.82+0.18*sin(2*PI*0.18*t))"
+        )
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"aevalsrc={expr}:s=22050:d={int(duration) + 2}",
+            "-af",
+            (
+                "highpass=f=35,"
+                "lowpass=f=4200,"
+                "aecho=0.82:0.75:60:0.24,"
+                "acompressor=threshold=-22dB:ratio=2.0:attack=20:release=260,"
+                "afade=t=in:st=0:d=1.2,"
+                f"afade=t=out:st={max(0, int(duration) - 1)}:d=2"
+            ),
+            out_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            if get_verbose():
+                warning(
+                    "Manifestation ambient music generation failed: "
+                    f"{result.stderr.decode(errors='ignore')[:300]}"
+                )
+            return ""
+        if get_verbose():
+            info(f"Generated manifestation ambient music: {out_path}")
         return out_path
 
     def _build_subtitle_generator(self):
@@ -1528,8 +1628,13 @@ Subject: {self.subject}"""
         final_clip = final_clip.set_fps(30)
         random_song = choose_random_song()
         generated_music = ""
-        if not random_song and self._is_finance_channel():
-            generated_music = self._generate_finance_music(max_duration)
+        if not random_song:
+            if self._is_cryptohub_channel() or self._is_finance_channel():
+                generated_music = self._generate_finance_music(max_duration)
+            elif self._is_psychology_channel():
+                generated_music = self._generate_psychology_music(max_duration)
+            elif self._is_manifestation_channel():
+                generated_music = self._generate_manifestation_music(max_duration)
 
         subtitles = None
         if not music_only:
