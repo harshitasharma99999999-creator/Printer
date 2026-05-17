@@ -531,6 +531,9 @@ Style: premium CryptoHub channel focused on bitcoin, crypto facts, market psycho
 Use formats like:
 "The Bitcoin Truth Nobody Sees", "This Crypto Signal Matters", "Why Ethereum Moves First", "The Hidden Crypto Pattern"
 Include 2-3 hashtags like #Crypto #Bitcoin #Ethereum
+SEO:
+- naturally include one strong searchable keyword like Bitcoin, Ethereum, crypto market, altcoins, blockchain, or crypto trading
+- make it curiosity-driven and broad-audience friendly
 Only return the title. Under 100 characters.
 Subject: {self.subject}"""
             )
@@ -561,6 +564,11 @@ Subject: {self.subject}"""
                 "blockchain",
                 "crypto news",
                 "crypto facts",
+                "crypto shorts",
+                "bitcoin news",
+                "ethereum news",
+                "crypto market",
+                "crypto trading",
                 "on chain",
                 "market psychology",
                 "shorts",
@@ -578,7 +586,7 @@ Subject: {self.subject}"""
             description = (
                 f"{subject_line}\n\n"
                 f"{summary_line}\n\n"
-                "#Shorts #Crypto #Bitcoin #Ethereum #CryptoHub"
+                "#Shorts #Crypto #Bitcoin #Ethereum #CryptoNews"
             )
 
             self.metadata = {"title": title, "description": description, "tags": tags}
@@ -590,6 +598,9 @@ Style: finance facts channel focused on cool stock market, forex, and crypto ins
 Use formats like:
 "The Market Fact Nobody Tells You", "This Crypto Truth Is Wild", "Why Traders Watch This", "The Hidden Forex Rule"
 Include 2-3 hashtags like #StockMarket #Forex #Crypto
+SEO:
+- naturally include a searchable keyword like stock market, forex, bitcoin, trading, investing, market crash, volatility, or market psychology
+- make it broad-audience friendly and curiosity-driven
 Only return the title. Under 100 characters.
 Subject: {self.subject}"""
             )
@@ -622,6 +633,11 @@ Subject: {self.subject}"""
                 "finance",
                 "bitcoin",
                 "money",
+                "stock market facts",
+                "market psychology",
+                "forex trading",
+                "crypto trading",
+                "investing for beginners",
                 "shorts",
             ]
             for tag in broad_tags:
@@ -637,7 +653,7 @@ Subject: {self.subject}"""
             description = (
                 f"{subject_line}\n\n"
                 f"{summary_line}\n\n"
-                "#Shorts #StockMarket #Forex #Crypto #Trading"
+                "#Shorts #StockMarket #Forex #Crypto #TradingTips"
             )
 
             self.metadata = {"title": title, "description": description, "tags": tags}
@@ -967,13 +983,14 @@ Subject: {self.subject}"""
     def _generate_finance_music(self, duration: float) -> str:
         out_path = os.path.join(ROOT_DIR, ".mp", f"finance_ambient_{uuid4().hex[:6]}.wav")
         expr = (
-            "(0.11*sin(2*PI*55.00*t)"
-            "+0.09*sin(2*PI*110.00*t)"
-            "+0.07*sin(2*PI*164.81*t)"
-            "+0.05*sin(2*PI*220.00*t)"
-            "+0.035*sin(2*PI*329.63*t)"
-            "+0.018*sin(2*PI*880.00*t)*(0.55+0.45*sin(2*PI*2.2*t)))"
-            "*(0.76+0.24*sin(2*PI*0.42*t))"
+            "(0.16*sin(2*PI*48.00*t)"
+            "+0.10*sin(2*PI*96.00*t)"
+            "+0.08*sin(2*PI*192.00*t)"
+            "+0.05*sin(2*PI*288.00*t)"
+            "+0.03*sin(2*PI*384.00*t)"
+            "+0.025*sin(2*PI*768.00*t)*(0.45+0.55*sin(2*PI*3.4*t))"
+            "+0.02*sin(2*PI*1536.00*t)*(0.35+0.65*sin(2*PI*6.8*t)))"
+            "*(0.72+0.28*sin(2*PI*0.48*t))"
         )
         cmd = [
             "ffmpeg", "-y",
@@ -982,9 +999,11 @@ Subject: {self.subject}"""
             "-af",
             (
                 "highpass=f=40,"
-                "lowpass=f=3200,"
-                "aecho=0.7:0.65:35:0.14,"
-                "afade=t=in:st=0:d=1.2,"
+                "lowpass=f=5400,"
+                "acompressor=threshold=-18dB:ratio=2.5:attack=20:release=180,"
+                "aecho=0.75:0.68:42:0.18,"
+                "treble=g=4:f=2800:w=0.7,"
+                "afade=t=in:st=0:d=0.8,"
                 f"afade=t=out:st={max(0, int(duration) - 1)}:d=2"
             ),
             out_path,
