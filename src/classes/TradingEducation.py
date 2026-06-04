@@ -9,6 +9,7 @@ from config import ROOT_DIR, get_verbose
 from llm_provider import generate_text
 from status import info
 
+from .TradingChartVisuals import generate_chart_story_images
 from .LongForm import LongForm
 
 
@@ -46,6 +47,36 @@ TRADING_CURRICULUM = [
             "Multiple time frame analysis",
             "Volume analysis and why price needs participation",
             "Market structure: higher highs, lower lows, and trend changes",
+        ],
+    },
+    {
+        "module": "Candlestick Masterclass",
+        "lessons": [
+            "How one candlestick shows open, high, low, and close",
+            "Bullish candles and bearish candles explained on real charts",
+            "Wicks explained: rejection, liquidity, and failed moves",
+            "Doji candles and market indecision",
+            "Hammer candles and why context matters",
+            "Shooting star candles and rejection at resistance",
+            "Bullish engulfing candles with real chart movement",
+            "Bearish engulfing candles with real chart movement",
+            "Inside bars, outside bars, and compression",
+            "Why candlestick patterns fail without trend and level context",
+        ],
+    },
+    {
+        "module": "Chart Patterns With Real Movement",
+        "lessons": [
+            "Double tops and double bottoms explained on real charts",
+            "Head and shoulders pattern explained step by step",
+            "Triangles, compression, and breakout pressure",
+            "Flags and pullbacks inside trending markets",
+            "Cup and handle pattern without beginner hype",
+            "Breakout, retest, and continuation explained",
+            "Fakeouts and liquidity grabs on real chart movement",
+            "Support and resistance flips explained visually",
+            "Trendlines, channels, and when they stop working",
+            "How to read patterns without predicting the future",
         ],
     },
     {
@@ -351,6 +382,16 @@ Rules:
             f"abstract but realistic visualization of market structure and risk control using charts and light trails, no words",
             f"wide shot of a professional trading desk built for learning, organized screens, risk journal, no text",
         ]
+
+    def generate_images(self) -> List[str]:
+        lesson = self.lesson or self._select_next_lesson()
+        info("Generating real chart visuals (16:9)...")
+        self.images = generate_chart_story_images(
+            f"{lesson['title']} - {lesson['module']}",
+            count=10,
+            vertical=False,
+        )
+        return self.images
 
     def generate_thumbnail(self) -> str:
         lesson = self.lesson or self._select_next_lesson()

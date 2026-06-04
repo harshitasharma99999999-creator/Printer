@@ -6,6 +6,7 @@ from config import get_script_sentence_length, get_verbose
 from llm_provider import generate_text
 from status import error, info, success, warning
 
+from .TradingChartVisuals import generate_chart_story_images
 from .YouTube import YouTube
 
 
@@ -34,8 +35,13 @@ Use formats like:
 - "How Support And Resistance Actually Work"
 - "The Difference Between Breakout And Fakeout"
 - "Why Most Beginners Overtrade"
+- "How A Doji Candle Shows Indecision"
+- "Bullish Engulfing Explained On A Real Chart"
+- "What A Hammer Candle Actually Means"
+- "Double Top Pattern Explained Simply"
 Rules:
 - Teach one beginner concept only
+- Prefer candlesticks, price action, chart patterns, support, resistance, or risk lessons
 - No live trade calls, no price predictions, no profit promises
 - Make it useful, simple, and curiosity-driven
 - Return ONLY the topic as one sentence
@@ -181,3 +187,22 @@ Subject: {self.subject}"""
             info(f" => Generated Image Prompts: {image_prompts}")
         success(f"Generated {len(image_prompts)} Image Prompts.")
         return image_prompts
+
+    def generate_video(self, tts_instance) -> str:
+        try:
+            if not hasattr(self, "subject") or not self.subject:
+                self.generate_topic()
+
+            self.generate_script()
+            self.generate_metadata()
+
+            info("Generating real chart visuals for Tradingclub Short...")
+            self.images = generate_chart_story_images(self.subject, count=5, vertical=True)
+
+            self.generate_script_to_speech(tts_instance)
+            path = self.combine()
+            self.video_path = path
+            return path
+        except Exception as exc:
+            error(f"Tradingclub Short generation failed: {exc}")
+            raise

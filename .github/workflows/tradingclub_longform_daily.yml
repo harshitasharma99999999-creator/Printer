@@ -83,7 +83,7 @@ jobs:
           cat > .mp/youtube.json << 'EOF'
           {"accounts": [{"id": "tradingclub-q7u", "nickname": "Tradingclub-q7u", "firefox_profile": "", "niche": "trading education from scratch beginner trading course risk management technical analysis stock forex crypto trading psychology", "language": "english", "videos": []}]}
           EOF
-          lesson_index=$(( (GITHUB_RUN_NUMBER - 1) % 48 ))
+          lesson_index=$(( (GITHUB_RUN_NUMBER - 1) % 68 ))
           printf '{"next_lesson_index": %s, "completed": []}\n' "$lesson_index" > .mp/trading_curriculum.json
           cat .mp/trading_curriculum.json
 
