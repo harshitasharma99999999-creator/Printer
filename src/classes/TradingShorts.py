@@ -1,8 +1,10 @@
 import json
+import os
 import re
 from typing import List
+from uuid import uuid4
 
-from config import get_script_sentence_length, get_verbose
+from config import ROOT_DIR, get_script_sentence_length, get_threads, get_verbose
 from llm_provider import generate_text
 from status import error, info, success, warning
 
@@ -206,3 +208,33 @@ Subject: {self.subject}"""
         except Exception as exc:
             error(f"Tradingclub Short generation failed: {exc}")
             raise
+
+    def combine(self) -> str:
+        from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips
+
+        if not self.images:
+            raise RuntimeError("No chart images were generated for the Tradingclub Short.")
+
+        audio = AudioFileClip(self.tts_path)
+        duration = audio.duration
+        per_image = duration / max(1, len(self.images))
+        clips = []
+        for image_path in self.images:
+            clip = ImageClip(image_path).set_duration(per_image).set_fps(30)
+            if clip.size != (1080, 1920):
+                clip = clip.resize((1080, 1920))
+            clips.append(clip)
+
+        final = concatenate_videoclips(clips).set_duration(duration).set_audio(audio)
+        out_path = os.path.join(ROOT_DIR, ".mp", f"trading-short-{uuid4().hex[:8]}.mp4")
+        final.write_videofile(
+            out_path,
+            threads=get_threads(),
+            fps=30,
+            codec="libx264",
+            audio_codec="aac",
+            preset="faster",
+        )
+        self.video_path = out_path
+        success(f'Wrote Tradingclub Short to "{out_path}"')
+        return out_path
