@@ -10,6 +10,7 @@ from llm_provider import generate_text
 from status import info
 
 from .TradingChartVisuals import generate_chart_story_images
+from .TradingVoice import TradingVoice
 from .LongForm import LongForm
 
 
@@ -392,6 +393,12 @@ Rules:
             vertical=False,
         )
         return self.images
+
+    def generate_tts(self) -> str:
+        path = os.path.join(ROOT_DIR, ".mp", f"trading-voice-{datetime.now().strftime('%Y%m%d%H%M%S')}.wav")
+        TradingVoice().synthesize(re.sub(r"[^\w\s.?!,]", "", self.script), path)
+        self.tts_path = path
+        return path
 
     def generate_thumbnail(self) -> str:
         lesson = self.lesson or self._select_next_lesson()

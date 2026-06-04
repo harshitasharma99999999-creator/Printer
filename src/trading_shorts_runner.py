@@ -4,7 +4,7 @@ import sys
 
 from cache import get_cache_path
 from classes.TradingShorts import TRADING_SHORTS_NICHE, TradingShorts
-from classes.Tts import TTS
+from classes.TradingVoice import TradingVoice
 from config import get_groq_api_key, get_ollama_model
 from llm_provider import select_model
 from status import error, info, success
@@ -46,7 +46,7 @@ def main() -> None:
 
     preflight_youtube_api(TradingShorts._get_yt_credentials(), verbose=True)
     info("Running Tradingclub Shorts pipeline...")
-    youtube.generate_video(TTS())
+    youtube.generate_video(TradingVoice())
     ok = youtube.upload_video()
     if not ok:
         error("Tradingclub Shorts upload failed.")
