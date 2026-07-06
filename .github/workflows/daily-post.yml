@@ -37,7 +37,9 @@ jobs:
       INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
       INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
       INSTAGRAM_GRAPH_VERSION: v23.0
-      INSTAGRAM_MODE: auto
+      # Manual until the disabled Facebook developer account is recovered.
+      # Change to "auto" after Graph API credentials are configured.
+      INSTAGRAM_MODE: manual
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       ALLOW_GENERATION_FALLBACK: ${{ inputs.dry_run || 'false' }}
 
