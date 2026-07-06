@@ -1,0 +1,6 @@
+{"timestamp": "2026-07-06T15:19:25+00:00", "event": "run_started", "run_id": "20260706T151925Z", "dry_run": true, "allow_fallback": true}
+{"timestamp": "2026-07-06T15:19:25+00:00", "event": "item_selected", "item_id": "muscle-builder-bowl", "item_name": "Muscle Builder Bowl"}
+{"timestamp": "2026-07-06T15:19:28+00:00", "event": "copy_generated", "title": "Muscle Builder Bowl | 24g Protein | #Shorts"}
+{"timestamp": "2026-07-06T15:19:33+00:00", "event": "voice_generated", "path": "output/20260706T151925Z/narration.mp3"}
+{"timestamp": "2026-07-06T15:20:15+00:00", "event": "video_generated", "duration_seconds": 28.64, "avatar_status": "fallback (RuntimeError)"}
+{"timestamp": "2026-07-06T15:20:15+00:00", "event": "run_complete", "youtube": {"status": "skipped_dry_run", "url": null}, "instagram": {"status": "manual_required", "reason": "Dry run: automatic upload skipped", "package": "/home/runner/work/Printer/Printer/output/20260706T151925Z/instagram-manual", "url": null}}
