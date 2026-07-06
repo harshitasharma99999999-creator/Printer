@@ -114,8 +114,11 @@ India does not observe daylight saving time.
 - Copy validation rejects unsafe phrases and requires both exact ordering URLs
   and all required hashtags.
 - Set `INSTAGRAM_MODE=manual` to force the manual package.
+- Set `AVATAR_MODE=visual` to use the branded fruit-visual fallback without
+  consuming HeyGen credits; use `auto` to enable the realistic presenter.
 - Live Actions disable generation fallbacks so a missing voice/avatar cannot
-  silently publish a presenter-free ad.
+  silently publish an unintended presenter-free ad. Explicit visual mode is
+  recorded in each run manifest.
 - Videos and audio stay in 30-day Actions artifacts rather than bloating Git.
   Durable upload URLs and statuses are committed in post history.
 - Use only owned/licensed product photos and music. Optional music files are

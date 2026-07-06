@@ -29,6 +29,7 @@ jobs:
       VOICE_ID: ${{ vars.VOICE_ID }}
       AVATAR_API_KEY: ${{ secrets.AVATAR_API_KEY }}
       AVATAR_ID: ${{ vars.AVATAR_ID }}
+      AVATAR_MODE: visual
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
@@ -64,7 +65,7 @@ jobs:
         shell: bash
         run: |
           missing=0
-          for name in OPENAI_API_KEY VOICE_API_KEY AVATAR_API_KEY AVATAR_ID YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET YOUTUBE_REFRESH_TOKEN; do
+          for name in OPENAI_API_KEY VOICE_API_KEY YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET YOUTUBE_REFRESH_TOKEN; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for a live run"
               missing=1

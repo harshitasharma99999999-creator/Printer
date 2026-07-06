@@ -188,7 +188,10 @@ def render(
     work_dir.mkdir(parents=True, exist_ok=True)
     presenter = work_dir / "presenter.mp4"
     avatar_status = "generated"
-    if os.getenv("AVATAR_API_KEY") and os.getenv("AVATAR_ID"):
+    avatar_mode = os.getenv("AVATAR_MODE", "auto").strip().lower()
+    if avatar_mode == "visual":
+        avatar_status = "fallback (visual mode configured)"
+    elif os.getenv("AVATAR_API_KEY") and os.getenv("AVATAR_ID"):
         try:
             request_heygen_presenter(audio_path, presenter)
         except Exception as error:
