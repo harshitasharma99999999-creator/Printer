@@ -1,0 +1,62 @@
+[
+  {
+    "id": "muscle-builder-bowl",
+    "name": "Muscle Builder Bowl",
+    "ingredients": ["banana", "apple", "papaya", "pomegranate", "Greek yogurt", "chia seeds"],
+    "benefits": ["protein-rich", "fiber-rich", "energy boosting"],
+    "serving_size": "450 g",
+    "calories": 410,
+    "protein": "24 g",
+    "price": "₹249",
+    "zomato_link": "https://zomato.onelink.me/xqzv/w36rgxfb",
+    "swiggy_link": "https://www.swiggy.com/menu/1308871?source=sharing"
+  },
+  {
+    "id": "berry-blast-protein-bowl",
+    "name": "Berry Blast Protein Bowl",
+    "ingredients": ["strawberry", "blueberry", "banana", "Greek yogurt", "pumpkin seeds"],
+    "benefits": ["protein-rich", "refreshing", "made with fresh fruits"],
+    "serving_size": "400 g",
+    "calories": 365,
+    "protein": "22 g",
+    "price": "₹279",
+    "zomato_link": "https://zomato.onelink.me/xqzv/w36rgxfb",
+    "swiggy_link": "https://www.swiggy.com/menu/1308871?source=sharing"
+  },
+  {
+    "id": "healthy-fruit-bowl",
+    "name": "Healthy Fruit Bowl",
+    "ingredients": ["apple", "banana", "papaya", "watermelon", "pomegranate", "orange"],
+    "benefits": ["fiber-rich", "refreshing", "healthy choice"],
+    "serving_size": "400 g",
+    "calories": 245,
+    "protein": "5 g",
+    "price": "₹199",
+    "zomato_link": "https://zomato.onelink.me/xqzv/w36rgxfb",
+    "swiggy_link": "https://www.swiggy.com/menu/1308871?source=sharing"
+  },
+  {
+    "id": "dragon-fruit-protein-bowl",
+    "name": "Dragon Fruit Protein Bowl",
+    "ingredients": ["dragon fruit", "banana", "pomegranate", "Greek yogurt", "sunflower seeds"],
+    "benefits": ["protein-rich", "fiber-rich", "refreshing"],
+    "serving_size": "420 g",
+    "calories": 380,
+    "protein": "21 g",
+    "price": "₹289",
+    "zomato_link": "https://zomato.onelink.me/xqzv/w36rgxfb",
+    "swiggy_link": "https://www.swiggy.com/menu/1308871?source=sharing"
+  },
+  {
+    "id": "classic-mixed-fruit-salad",
+    "name": "Classic Mixed Fruit Salad",
+    "ingredients": ["apple", "banana", "papaya", "watermelon", "pineapple", "pomegranate"],
+    "benefits": ["made with fresh fruits", "refreshing", "supports digestion"],
+    "serving_size": "350 g",
+    "calories": 210,
+    "protein": "4 g",
+    "price": "₹179",
+    "zomato_link": "https://zomato.onelink.me/xqzv/w36rgxfb",
+    "swiggy_link": "https://www.swiggy.com/menu/1308871?source=sharing"
+  }
+]

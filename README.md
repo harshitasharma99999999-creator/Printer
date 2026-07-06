@@ -1,3 +1,133 @@
+# Grand Forno Reels & Shorts Automation
+
+GitHub-only daily automation for promoting Grand Forno fruit bowls on
+[Instagram (`grand_forno`)](https://www.instagram.com/grand_forno/) and
+[YouTube (`@fornogrand`)](https://www.youtube.com/@fornogrand). There is no
+website, dashboard, server, or persistent worker. GitHub Actions generates,
+renders, publishes, records links, and commits structured logs.
+
+At 7:00 PM India time every day, `.github/workflows/daily-post.yml`:
+
+1. Picks the least recently posted item from `data/menu_items.json`.
+2. Generates safe sales copy and metadata with the OpenAI Responses API.
+3. Generates Indian-English narration with ElevenLabs.
+4. Requests a realistic vertical female presenter from HeyGen.
+5. Renders a 1080×1920, 20–35 second MP4 with FFmpeg, product imagery,
+   burned-in subtitles, benefits, branding, CTA, and order-link end screen.
+6. Uploads through YouTube Data API `videos.insert` and Instagram Graph API.
+7. Commits platform results and uploaded links to `data/post_history.json` and
+   timestamped JSONL files in `logs/`.
+
+If Instagram permissions, account eligibility, or publishing fail, the workflow
+still succeeds for Instagram by saving `grand-forno-reel.mp4`, `caption.txt`,
+and `manual-post.json` in the workflow artifact under
+`output/<run-id>/instagram-manual/`.
+
+## Repository layout
+
+```text
+data/menu_items.json              menu facts and order URLs
+data/post_history.json            committed upload history and links
+assets/logo.png                   Grand Forno branding
+assets/music/                     optional licensed music
+assets/product_images/            <item-id>.png/jpg or default image
+scripts/generate_script.py        OpenAI copy adapter
+scripts/generate_voice.py         ElevenLabs voice adapter
+scripts/generate_video.py         HeyGen + FFmpeg render pipeline
+scripts/post_youtube.py           YouTube resumable upload
+scripts/post_instagram.py         Instagram resumable upload + fallback
+scripts/update_history.py         atomic history update
+scripts/main.py                   daily orchestrator
+.github/workflows/daily-post.yml  schedule and manual trigger
+```
+
+Product image filenames should match each menu `id`, for example
+`assets/product_images/muscle-builder-bowl.jpg`. When one is absent, the
+included `default-fruit-bowl.png` is used.
+
+## One-time setup
+
+Fork or push this repository to GitHub, then enable Actions. In
+**Settings → Secrets and variables → Actions → Secrets**, add:
+
+| Secret | Purpose |
+|---|---|
+| `OPENAI_API_KEY` | Marketing script, caption, title, and overlays |
+| `VOICE_API_KEY` | ElevenLabs text-to-speech |
+| `AVATAR_API_KEY` | HeyGen presenter generation |
+| `YOUTUBE_CLIENT_ID` | Google OAuth client |
+| `YOUTUBE_CLIENT_SECRET` | Google OAuth client |
+| `YOUTUBE_REFRESH_TOKEN` | Refresh token with `youtube.upload` scope |
+| `INSTAGRAM_ACCESS_TOKEN` | Long-lived Meta token; optional for manual fallback |
+| `INSTAGRAM_ACCOUNT_ID` | Instagram professional account ID; optional for fallback |
+
+Under the adjacent **Variables** tab add:
+
+| Variable | Purpose |
+|---|---|
+| `AVATAR_ID` | A realistic female presenter/avatar ID available to the HeyGen account |
+| `VOICE_ID` | ElevenLabs voice ID; optional, defaults locally to a female voice |
+
+The Instagram account must be a Business or Creator account connected to a
+Facebook Page, and the token needs the current content-publishing permissions.
+Use a long-lived token and renew it before expiry. Instagram upload is binary
+and resumable; no public video host is required.
+
+For YouTube, enable YouTube Data API v3 in Google Cloud, configure OAuth
+consent, and generate a refresh token for the channel with
+`https://www.googleapis.com/auth/youtube.upload`. Google may force uploads from
+an unaudited API project to private even though the workflow requests `public`.
+Complete Google’s API audit if that restriction applies.
+
+The workflow requests write access only to commit `data/post_history.json` and
+`logs/`. In **Settings → Actions → General → Workflow permissions**, allow
+**Read and write permissions**. Branch protection must permit the bot push, or
+the commit step must be adapted to open a pull request.
+
+## Run and verify
+
+Start with **Actions → Grand Forno Daily Reel and Short → Run workflow** and
+enable `dry_run`. Dry-run mode makes no social API calls and uploads the video
+plus manual-post package as a GitHub Actions artifact.
+
+For local validation:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements-grand-forno.txt
+python scripts/main.py --dry-run --allow-fallback
+```
+
+Windows activation is `.\venv\Scripts\activate`. Install FFmpeg/ffprobe and
+`espeak-ng` first for the credential-free fallback. Copy `.env.example` to
+`.env` only for local work; never commit `.env` or real keys.
+
+After inspecting the 9:16 render, add production secrets and run without
+`dry_run`. The normal schedule is `30 13 * * *`, exactly 19:00 IST because
+India does not observe daylight saving time.
+
+## Content controls and operations
+
+- Menu claims come from `data/menu_items.json`; review calories, protein,
+  serving sizes, and prices before launch.
+- Copy validation rejects unsafe phrases and requires both exact ordering URLs
+  and all required hashtags.
+- Set `INSTAGRAM_MODE=manual` to force the manual package.
+- Live Actions disable generation fallbacks so a missing voice/avatar cannot
+  silently publish a presenter-free ad.
+- Videos and audio stay in 30-day Actions artifacts rather than bloating Git.
+  Durable upload URLs and statuses are committed in post history.
+- Use only owned/licensed product photos and music. Optional music files are
+  intentionally not mixed by default until rights and loudness are reviewed.
+- The generated realistic avatar is disclosed to YouTube with
+  `containsSyntheticMedia=true`.
+
+Sample output is in `examples/sample_script.txt` and
+`examples/sample_caption.txt`.
+
+---
+
 # MoneyPrinter V2
  
 > ♥︎ **Sponsor**: The Best AI Chat App: [shiori.ai](https://www.shiori.ai). Use code **MPV2** for 20% off.
