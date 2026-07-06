@@ -95,7 +95,9 @@ def request_heygen_presenter(audio_path: Path, output: Path) -> None:
                     "background": {"type": "color", "value": "#FFF6E8"},
                 }
             ],
-            "dimension": {"width": 1080, "height": 1920},
+            # HeyGen's free API tier is limited to 720p. The final FFmpeg
+            # composition still upscales and exports at the required 1080x1920.
+            "dimension": {"width": 720, "height": 1280},
             "aspect_ratio": "9:16",
             "caption": False,
         },
