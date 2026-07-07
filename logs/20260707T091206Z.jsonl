@@ -1,0 +1,8 @@
+{"timestamp": "2026-07-07T09:12:06+00:00", "event": "run_started", "run_id": "20260707T091206Z", "dry_run": false, "allow_fallback": false}
+{"timestamp": "2026-07-07T09:12:06+00:00", "event": "item_selected", "item_id": "healthy-fruit-bowl", "item_name": "Healthy Fruit Bowl"}
+{"timestamp": "2026-07-07T09:12:09+00:00", "event": "copy_generated", "title": "Grand Forno Healthy Fruit Bowl | #Shorts"}
+{"timestamp": "2026-07-07T09:12:14+00:00", "event": "voice_generated", "path": "output/20260707T091206Z/narration.mp3"}
+{"timestamp": "2026-07-07T09:12:42+00:00", "event": "video_generated", "duration_seconds": 27.3, "avatar_status": "fallback (visual mode configured)"}
+{"timestamp": "2026-07-07T09:12:44+00:00", "event": "youtube_complete", "result": {"status": "uploaded", "video_id": "lukAnVscXe8", "url": "https://www.youtube.com/shorts/lukAnVscXe8"}}
+{"timestamp": "2026-07-07T09:12:47+00:00", "event": "instagram_complete", "result": {"status": "manual_required", "reason": "Upload-Post Instagram auto-publish failed: HTTPError: 400 Client Error: Bad Request for url: https://api.upload-post.com/api/upload", "package": "/home/runner/work/Printer/Printer/output/20260707T091206Z/instagram-manual", "url": null}}
+{"timestamp": "2026-07-07T09:12:47+00:00", "event": "run_complete", "youtube": {"status": "uploaded", "video_id": "lukAnVscXe8", "url": "https://www.youtube.com/shorts/lukAnVscXe8"}, "instagram": {"status": "manual_required", "reason": "Upload-Post Instagram auto-publish failed: HTTPError: 400 Client Error: Bad Request for url: https://api.upload-post.com/api/upload", "package": "/home/runner/work/Printer/Printer/output/20260707T091206Z/instagram-manual", "url": null}}
