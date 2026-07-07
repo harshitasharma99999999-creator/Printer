@@ -63,9 +63,9 @@ Fork or push this repository to GitHub, then enable Actions. In
 | `YOUTUBE_REFRESH_TOKEN` | Refresh token with `youtube.upload` scope |
 | `INSTAGRAM_ACCESS_TOKEN` | Long-lived Meta token for official Graph API; optional when private fallback is used |
 | `INSTAGRAM_ACCOUNT_ID` | Instagram professional account ID for official Graph API; optional when private fallback is used |
-| `INSTAGRAM_USERNAME` | Last-resort private API fallback username |
-| `INSTAGRAM_PASSWORD` | Last-resort private API fallback password |
-| `INSTAGRAM_SESSION_JSON` | Preferred private API session JSON after local verification |
+| `GRAND_FORNO_INSTAGRAM_USERNAME` | Last-resort private API fallback username |
+| `GRAND_FORNO_INSTAGRAM_PASSWORD` | Last-resort private API fallback password |
+| `GRAND_FORNO_INSTAGRAM_SESSION_JSON` | Preferred private API session JSON after local verification |
 
 Under the adjacent **Variables** tab add:
 
@@ -98,10 +98,11 @@ python scripts/gen_instagram_session.py
 ```
 
 Complete any OTP/challenge that Instagram asks for, then save the produced JSON
-as the `INSTAGRAM_SESSION_JSON` GitHub secret. If you skip session JSON, the
-workflow can use `INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`, but that is more
-likely to trigger a checkpoint from GitHub's servers. Never paste passwords into
-chat or commit them to Git.
+as the `GRAND_FORNO_INSTAGRAM_SESSION_JSON` GitHub secret. If you skip session
+JSON, the workflow can use `GRAND_FORNO_INSTAGRAM_USERNAME` and
+`GRAND_FORNO_INSTAGRAM_PASSWORD`, but that is more likely to trigger a
+checkpoint from GitHub's servers. Never paste passwords into chat or commit them
+to Git.
 
 For YouTube, enable YouTube Data API v3 in Google Cloud, configure OAuth
 consent, and generate a refresh token for the channel with

@@ -40,9 +40,9 @@ jobs:
       # Preferred: meta_graph. Last-resort fallback: instagrapi private API.
       # The private API can trigger checkpoints or account lockouts.
       INSTAGRAM_PROVIDER: instagrapi
-      INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
-      INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
-      INSTAGRAM_SESSION_JSON: ${{ secrets.INSTAGRAM_SESSION_JSON }}
+      INSTAGRAM_USERNAME: ${{ secrets.GRAND_FORNO_INSTAGRAM_USERNAME }}
+      INSTAGRAM_PASSWORD: ${{ secrets.GRAND_FORNO_INSTAGRAM_PASSWORD }}
+      INSTAGRAM_SESSION_JSON: ${{ secrets.GRAND_FORNO_INSTAGRAM_SESSION_JSON }}
       INSTAGRAM_MODE: auto
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       ALLOW_GENERATION_FALLBACK: ${{ inputs.dry_run || 'false' }}
