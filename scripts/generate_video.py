@@ -163,16 +163,35 @@ def ffmpeg_path(path: Path) -> str:
     return str(path.resolve()).replace("\\", "/").replace(":", r"\:")
 
 
-def find_product_image(item_id: str) -> Path:
+def find_product_image(item_id: str, allow_fallback: bool = False) -> Path:
     image_dir = ROOT / "assets" / "product_images"
     for suffix in (".png", ".jpg", ".jpeg", ".webp"):
         candidate = image_dir / f"{item_id}{suffix}"
         if candidate.exists():
             return candidate
+    if not allow_fallback:
+        raise RuntimeError(
+            f"Missing item-specific product visual for {item_id}. "
+            f"Add assets/product_images/{item_id}.png or .jpg before publishing."
+        )
     default = image_dir / "default-fruit-bowl.png"
     if default.exists():
         return default
     return ROOT / "assets" / "logo.png"
+
+
+def find_background_music() -> Path | None:
+    configured = os.getenv("BACKGROUND_MUSIC_PATH", "").strip()
+    candidates: list[Path] = []
+    if configured:
+        candidates.append((ROOT / configured).resolve() if not Path(configured).is_absolute() else Path(configured))
+    music_dir = ROOT / "assets" / "music"
+    for suffix in ("*.mp3", "*.m4a", "*.wav", "*.aac", "*.ogg"):
+        candidates.extend(sorted(music_dir.glob(suffix)))
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file() and candidate.stat().st_size > 0:
+            return candidate
+    return None
 
 
 def render(
@@ -228,7 +247,8 @@ def render(
     logo = ROOT / "assets" / "logo.png"
     if not logo.exists():
         raise RuntimeError("assets/logo.png is required")
-    product = find_product_image(content["item"]["id"])
+    product = find_product_image(content["item"]["id"], allow_fallback=allow_fallback)
+    music = find_background_music()
     font = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
     if not font.exists():
         font = ROOT / "fonts" / "bold_font.ttf"
@@ -239,6 +259,8 @@ def render(
     else:
         command += ["-loop", "1", "-i", str(product)]
     command += ["-i", str(audio_path), "-i", str(logo), "-loop", "1", "-i", str(product)]
+    if music:
+        command += ["-stream_loop", "-1", "-i", str(music)]
 
     end_start = max(0.0, duration - 5.0)
     filter_graph = (
@@ -273,15 +295,24 @@ def render(
         f"fontcolor=white:fontsize=29:line_spacing=18:x=(w-text_w)/2:y=900:"
         f"enable='gte(t,{end_start:.2f})'[v]"
     )
+    if music:
+        music_fade_out = max(0.0, duration - 1.5)
+        filter_graph += (
+            f";[1:a]volume=1.0[narration];"
+            f"[4:a]atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,"
+            f"volume=0.12,afade=t=in:st=0:d=1.0,"
+            f"afade=t=out:st={music_fade_out:.3f}:d=1.5[music];"
+            f"[narration][music]amix=inputs=2:duration=first:dropout_transition=0,apad[a]"
+        )
+        audio_options = ["-map", "[a]"]
+    else:
+        audio_options = ["-map", "1:a:0", "-af", "apad"]
     command += [
         "-filter_complex",
         filter_graph,
         "-map",
         "[v]",
-        "-map",
-        "1:a:0",
-        "-af",
-        "apad",
+        *audio_options,
         "-t",
         f"{duration:.3f}",
         "-r",
@@ -303,7 +334,12 @@ def render(
         str(output),
     ]
     run(command)
-    return {"duration_seconds": round(duration, 2), "avatar_status": avatar_status}
+    return {
+        "duration_seconds": round(duration, 2),
+        "avatar_status": avatar_status,
+        "product_visual": str(product.relative_to(ROOT)),
+        "background_music": str(music.relative_to(ROOT)) if music else None,
+    }
 
 
 def main() -> None:

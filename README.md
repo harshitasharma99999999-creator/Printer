@@ -45,8 +45,15 @@ scripts/main.py                   daily orchestrator
 ```
 
 Product image filenames should match each menu `id`, for example
-`assets/product_images/muscle-builder-bowl.jpg`. When one is absent, the
-included `default-fruit-bowl.png` is used.
+`assets/product_images/muscle-builder-bowl.jpg`. For production publishing,
+each menu item must have its own visual at
+`assets/product_images/<item-id>.png` or `.jpg`. The live workflow now fails
+instead of silently publishing the same default visual for every item. Dry runs
+may still use the default fallback for local testing.
+
+Background music is loaded from `assets/music/` or from `BACKGROUND_MUSIC_PATH`
+when set. The included `assets/music/fresh-upbeat-loop.wav` is a generated,
+royalty-free loop and is mixed quietly under narration with fade-in/fade-out.
 
 ## One-time setup
 
@@ -169,6 +176,8 @@ India does not observe daylight saving time.
   fallback.
 - Set `AVATAR_MODE=visual` to use the branded fruit-visual fallback without
   consuming HeyGen credits; use `auto` to enable the realistic presenter.
+- Set `BACKGROUND_MUSIC_PATH` to a different owned/licensed music file if you
+  want to change the daily Reel/Short music.
 - Live Actions disable generation fallbacks so a missing voice/avatar cannot
   silently publish an unintended presenter-free ad. Explicit visual mode is
   recorded in each run manifest.
