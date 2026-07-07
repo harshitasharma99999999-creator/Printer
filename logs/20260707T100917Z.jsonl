@@ -1,0 +1,6 @@
+{"timestamp": "2026-07-07T10:09:17+00:00", "event": "run_started", "run_id": "20260707T100917Z", "dry_run": true, "allow_fallback": true}
+{"timestamp": "2026-07-07T10:09:17+00:00", "event": "item_selected", "item_id": "muscle-builder-bowl", "item_name": "Muscle Builder Bowl"}
+{"timestamp": "2026-07-07T10:09:20+00:00", "event": "copy_generated", "title": "Muscle Builder Bowl | 24 g Protein | Grand Forno #Shorts"}
+{"timestamp": "2026-07-07T10:09:25+00:00", "event": "voice_generated", "path": "output/20260707T100917Z/narration.mp3"}
+{"timestamp": "2026-07-07T10:09:56+00:00", "event": "video_generated", "duration_seconds": 30.07, "avatar_status": "fallback (visual mode configured)", "product_visual": "assets/product_images/muscle-builder-bowl.png", "background_music": "assets/music/fresh-upbeat-loop.wav"}
+{"timestamp": "2026-07-07T10:09:56+00:00", "event": "run_complete", "youtube": {"status": "skipped_dry_run", "url": null}, "instagram": {"status": "manual_required", "reason": "Dry run: automatic upload skipped", "package": "/home/runner/work/Printer/Printer/output/20260707T100917Z/instagram-manual", "url": null}}
