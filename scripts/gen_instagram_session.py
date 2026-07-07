@@ -2,7 +2,12 @@
 Generate Instagram session JSON for use as a GitHub secret.
 Usage:  python scripts/gen_instagram_session.py
 """
-import json, sys, os
+import getpass
+import json
+import os
+import sys
+from pathlib import Path
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 def main():
@@ -12,14 +17,25 @@ def main():
     except ImportError:
         print("Run: pip install instagrapi"); sys.exit(1)
 
-    username = os.environ.get("INSTAGRAM_USERNAME", "").strip()
-    password = os.environ.get("INSTAGRAM_PASSWORD", "").strip()
-    secret_name = os.environ.get("INSTAGRAM_SECRET_NAME", "INSTAGRAM_SESSION_JSON").strip() or "INSTAGRAM_SESSION_JSON"
+    username = (
+        os.environ.get("GRAND_FORNO_INSTAGRAM_USERNAME")
+        or os.environ.get("INSTAGRAM_USERNAME")
+        or ""
+    ).strip()
+    password = (
+        os.environ.get("GRAND_FORNO_INSTAGRAM_PASSWORD")
+        or os.environ.get("INSTAGRAM_PASSWORD")
+        or ""
+    ).strip()
+    secret_name = (
+        os.environ.get("INSTAGRAM_SECRET_NAME", "GRAND_FORNO_INSTAGRAM_SESSION_JSON").strip()
+        or "GRAND_FORNO_INSTAGRAM_SESSION_JSON"
+    )
 
     if not username:
         username = input("Instagram username: ").strip()
     if not password:
-        password = input("Instagram password: ").strip()
+        password = getpass.getpass("Instagram password: ").strip()
 
     cl = Client()
     cl.delay_range = [1, 3]
@@ -58,19 +74,18 @@ def main():
     session = cl.get_settings()
     session_json = json.dumps(session)
 
-    out_file = os.path.join(os.path.dirname(__file__), "..", f"session_{username}.json")
-    with open(out_file, "w") as f:
+    out_file = Path(__file__).resolve().parents[1] / f"session_{username}.json"
+    with out_file.open("w", encoding="utf-8") as f:
         f.write(session_json)
 
     print("\n" + "="*60)
-    print("SESSION JSON (copy this as your GitHub secret):")
+    print("Instagram session created.")
     print("="*60)
-    print(session_json)
-    print("="*60)
-    print(f"\nSaved to: session_{username}.json")
+    print(f"\nSaved locally to: {out_file.name}")
+    print("This file is ignored by Git. Do not commit or share it.")
     print("\nGitHub secret command:")
     print(
-        f'Get-Content session_{username}.json -Raw | & "C:\\Program Files\\GitHub CLI\\gh.exe" '
+        f'Get-Content {out_file.name} -Raw | & "C:\\Program Files\\GitHub CLI\\gh.exe" '
         f"secret set {secret_name}"
     )
 

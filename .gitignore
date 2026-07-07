@@ -1,5 +1,6 @@
 __pycache__
 .env
+session_*.json
 config.json
 token.json
 client_secrets.json
