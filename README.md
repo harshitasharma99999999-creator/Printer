@@ -16,8 +16,8 @@ At 7:00 PM India time every day, `.github/workflows/daily-post.yml`:
 5. Renders a 1080×1920, 20–35 second MP4 with FFmpeg, product imagery,
    burned-in subtitles, benefits, branding, CTA, and order-link end screen.
 6. Uploads through YouTube Data API `videos.insert` and Instagram. Instagram
-   uses the official Graph API when configured; this repo also includes an
-   accepted-risk `instagrapi` fallback for accounts blocked from Meta setup.
+   can use Upload-Post's OAuth-based connector, the official Meta Graph API, or
+   the accepted-risk `instagrapi` fallback.
 7. Commits platform results and uploaded links to `data/post_history.json` and
    timestamped JSONL files in `logs/`.
 
@@ -61,8 +61,9 @@ Fork or push this repository to GitHub, then enable Actions. In
 | `YOUTUBE_CLIENT_ID` | Google OAuth client |
 | `YOUTUBE_CLIENT_SECRET` | Google OAuth client |
 | `YOUTUBE_REFRESH_TOKEN` | Refresh token with `youtube.upload` scope |
-| `INSTAGRAM_ACCESS_TOKEN` | Long-lived Meta token for official Graph API; optional when private fallback is used |
-| `INSTAGRAM_ACCOUNT_ID` | Instagram professional account ID for official Graph API; optional when private fallback is used |
+| `UPLOAD_POST_API_KEY` | Upload-Post API key for Instagram publishing |
+| `INSTAGRAM_ACCESS_TOKEN` | Long-lived Meta token for official Graph API; optional when Upload-Post is used |
+| `INSTAGRAM_ACCOUNT_ID` | Instagram professional account ID for official Graph API; optional when Upload-Post is used |
 | `GRAND_FORNO_INSTAGRAM_USERNAME` | Last-resort private API fallback username |
 | `GRAND_FORNO_INSTAGRAM_PASSWORD` | Last-resort private API fallback password |
 | `GRAND_FORNO_INSTAGRAM_SESSION_JSON` | Preferred private API session JSON after local verification |
@@ -73,15 +74,31 @@ Under the adjacent **Variables** tab add:
 |---|---|
 | `AVATAR_ID` | A realistic female presenter/avatar ID available to the HeyGen account |
 | `VOICE_ID` | ElevenLabs voice ID; optional, defaults locally to a female voice |
+| `UPLOAD_POST_USER` | Upload-Post connected profile/user identifier, for example `grand-forno` |
 
-Recommended Instagram setup is still the official Meta Graph API: the Instagram
-account must be a Business or Creator account connected to a Facebook Page, and
-the token needs the current content-publishing permissions. Use a long-lived
-token and renew it before expiry. Instagram upload is binary and resumable; no
-public video host is required.
+Current Instagram setup uses Upload-Post because Grand Forno's Facebook account
+is disabled and the direct private API login is being blocked by Instagram:
 
-Because Grand Forno's Facebook account is currently disabled, the workflow is
-configured for the private API fallback with:
+```yaml
+INSTAGRAM_PROVIDER: upload_post
+UPLOAD_POST_USER: ${{ vars.UPLOAD_POST_USER }}
+UPLOAD_POST_API_KEY: ${{ secrets.UPLOAD_POST_API_KEY }}
+```
+
+Create/connect the Instagram profile inside Upload-Post, generate an API key,
+then save the key as the `UPLOAD_POST_API_KEY` GitHub secret and the connected
+profile identifier as the `UPLOAD_POST_USER` GitHub variable. The Upload-Post
+adapter sends the rendered MP4 to `POST /api/upload` with
+`platform[]=instagram`, `media_type=REELS`, `share_to_feed=true`, and the
+Grand Forno caption.
+
+The other official option is Meta Graph API: the Instagram account must be a
+Business or Creator account connected to a Facebook Page, and the token needs
+the current content-publishing permissions. Use a long-lived token and renew it
+before expiry. Instagram upload is binary and resumable; no public video host is
+required.
+
+If you intentionally switch back to the private API fallback, configure:
 
 ```yaml
 INSTAGRAM_PROVIDER: instagrapi
@@ -147,6 +164,7 @@ India does not observe daylight saving time.
 - Set `INSTAGRAM_MODE=manual` to force the manual package.
 - Set `INSTAGRAM_PROVIDER=meta_graph` when the Facebook/Meta account is
   recovered and official Instagram publishing credentials are ready.
+- Set `INSTAGRAM_PROVIDER=upload_post` for Upload-Post OAuth-based publishing.
 - Set `INSTAGRAM_PROVIDER=instagrapi` only for the accepted-risk private API
   fallback.
 - Set `AVATAR_MODE=visual` to use the branded fruit-visual fallback without

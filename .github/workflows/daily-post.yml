@@ -37,12 +37,14 @@ jobs:
       INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
       INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
       INSTAGRAM_GRAPH_VERSION: v23.0
-      # Preferred: meta_graph. Last-resort fallback: instagrapi private API.
-      # The private API can trigger checkpoints or account lockouts.
-      INSTAGRAM_PROVIDER: instagrapi
+      # Preferred official paths: meta_graph or upload_post. Last-resort: instagrapi.
+      INSTAGRAM_PROVIDER: upload_post
       INSTAGRAM_USERNAME: ${{ secrets.GRAND_FORNO_INSTAGRAM_USERNAME }}
       INSTAGRAM_PASSWORD: ${{ secrets.GRAND_FORNO_INSTAGRAM_PASSWORD }}
       INSTAGRAM_SESSION_JSON: ${{ secrets.GRAND_FORNO_INSTAGRAM_SESSION_JSON }}
+      UPLOAD_POST_API_KEY: ${{ secrets.UPLOAD_POST_API_KEY }}
+      UPLOAD_POST_USER: ${{ vars.UPLOAD_POST_USER }}
+      UPLOAD_POST_ASYNC: "true"
       INSTAGRAM_MODE: auto
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       ALLOW_GENERATION_FALLBACK: ${{ inputs.dry_run || 'false' }}
@@ -80,6 +82,12 @@ jobs:
           if [ "${INSTAGRAM_PROVIDER}" = "instagrapi" ]; then
             if [ -z "${INSTAGRAM_SESSION_JSON}" ] && { [ -z "${INSTAGRAM_USERNAME}" ] || [ -z "${INSTAGRAM_PASSWORD}" ]; }; then
               echo "::error::For Instagram private API posting, set INSTAGRAM_SESSION_JSON or both INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD"
+              missing=1
+            fi
+          fi
+          if [ "${INSTAGRAM_PROVIDER}" = "upload_post" ]; then
+            if [ -z "${UPLOAD_POST_API_KEY}" ] || [ -z "${UPLOAD_POST_USER}" ]; then
+              echo "::error::For Upload-Post Instagram publishing, set UPLOAD_POST_API_KEY secret and UPLOAD_POST_USER variable"
               missing=1
             fi
           fi

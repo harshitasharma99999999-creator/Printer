@@ -2,6 +2,7 @@
 
 Supported providers:
 - Official Meta Graph API (recommended and safest)
+- Upload-Post API (official third-party OAuth-based connector)
 - instagrapi private API fallback (risky; may trigger checkpoints/account locks)
 """
 
@@ -12,6 +13,7 @@ import json
 import os
 import shutil
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -191,6 +193,131 @@ def publish_private_api(video_path: Path, content_path: Path) -> dict[str, Any]:
     }
 
 
+def _upload_post_result(payload: dict[str, Any]) -> dict[str, Any]:
+    """Normalize Upload-Post API responses across sync and async shapes."""
+
+    results = payload.get("results")
+    instagram = None
+    if isinstance(results, dict):
+        instagram = results.get("instagram")
+    elif isinstance(results, list):
+        for platform_result in results:
+            if not isinstance(platform_result, dict):
+                continue
+            if str(platform_result.get("platform", "")).lower() == "instagram":
+                instagram = platform_result
+                break
+
+    if isinstance(instagram, dict):
+        success = instagram.get("success")
+        if success is False:
+            raise RuntimeError(f"Upload-Post Instagram upload failed: {instagram}")
+        url = (
+            instagram.get("url")
+            or instagram.get("post_url")
+            or instagram.get("permalink")
+            or instagram.get("share_url")
+        )
+        return {
+            "status": "uploaded" if url or success else "submitted",
+            "provider": "upload_post",
+            "media_id": instagram.get("id") or instagram.get("post_id"),
+            "url": url,
+            "raw_status": instagram.get("status") or instagram.get("message"),
+        }
+
+    if payload.get("success") is False:
+        raise RuntimeError(f"Upload-Post upload failed: {payload}")
+
+    url = payload.get("url") or payload.get("post_url") or payload.get("permalink")
+    return {
+        "status": "uploaded" if url else "submitted",
+        "provider": "upload_post",
+        "media_id": payload.get("id") or payload.get("post_id"),
+        "url": url,
+        "request_id": payload.get("request_id"),
+    }
+
+
+def _poll_upload_post_status(
+    api_base: str, api_key: str, request_id: str
+) -> dict[str, Any] | None:
+    deadline = time.monotonic() + int(os.getenv("UPLOAD_POST_POLL_SECONDS", "600"))
+    headers = {"Authorization": f"Apikey {api_key}"}
+    while time.monotonic() < deadline:
+        response = requests.get(
+            f"{api_base}/uploadposts/status",
+            params={"request_id": request_id},
+            headers=headers,
+            timeout=60,
+        )
+        if response.status_code == 404:
+            time.sleep(15)
+            continue
+        response.raise_for_status()
+        payload = response.json()
+        normalized = _upload_post_result(payload)
+        status_text = str(
+            normalized.get("raw_status") or payload.get("status") or normalized["status"]
+        ).lower()
+        if normalized.get("url") or status_text in {"uploaded", "published", "success", "complete", "completed"}:
+            return normalized
+        if status_text in {"failed", "error", "rejected"}:
+            raise RuntimeError(f"Upload-Post async upload failed: {payload}")
+        time.sleep(15)
+    return None
+
+
+def publish_upload_post(video_path: Path, content_path: Path) -> dict[str, Any]:
+    """Upload an Instagram Reel via Upload-Post's OAuth-based API."""
+
+    api_key = os.getenv("UPLOAD_POST_API_KEY", "").strip()
+    user = os.getenv("UPLOAD_POST_USER", "").strip()
+    api_base = os.getenv("UPLOAD_POST_API_BASE", "https://api.upload-post.com/api").rstrip("/")
+    async_upload = os.getenv("UPLOAD_POST_ASYNC", "true").lower() != "false"
+    request_id = os.getenv("UPLOAD_POST_REQUEST_ID", "").strip() or str(uuid.uuid4())
+    content = read_json(content_path)
+
+    if not api_key:
+        raise RuntimeError("UPLOAD_POST_API_KEY is required")
+    if not user:
+        raise RuntimeError("UPLOAD_POST_USER is required")
+
+    caption = content["caption"]
+    headers = {"Authorization": f"Apikey {api_key}"}
+    data: list[tuple[str, str]] = [
+        ("user", user),
+        ("platform[]", "instagram"),
+        ("title", caption),
+        ("instagram_title", caption),
+        ("media_type", "REELS"),
+        ("share_to_feed", "true"),
+        ("async_upload", "true" if async_upload else "false"),
+        ("request_id", request_id),
+    ]
+
+    with video_path.open("rb") as handle:
+        response = requests.post(
+            f"{api_base}/upload",
+            headers=headers,
+            data=data,
+            files={"video": (video_path.name, handle, "video/mp4")},
+            timeout=600,
+        )
+    response.raise_for_status()
+    payload = response.json()
+    result = _upload_post_result(payload)
+    result["request_id"] = result.get("request_id") or request_id
+
+    if async_upload and not result.get("url"):
+        polled = _poll_upload_post_status(api_base, api_key, request_id)
+        if polled:
+            polled["request_id"] = request_id
+            return polled
+
+    return result
+
+
 def post_or_package(
     video_path: Path, content_path: Path, manual_dir: Path
 ) -> dict[str, Any]:
@@ -216,6 +343,17 @@ def post_or_package(
                 content_path,
                 manual_dir,
                 f"Instagram private API auto-publish failed: {type(error).__name__}: {error}",
+            )
+
+    if provider in {"upload_post", "upload-post", "uploadpost"}:
+        try:
+            return publish_upload_post(video_path, content_path)
+        except Exception as error:
+            return manual_package(
+                video_path,
+                content_path,
+                manual_dir,
+                f"Upload-Post Instagram auto-publish failed: {type(error).__name__}: {error}",
             )
 
     if provider in {"meta_graph", "graph", "official"}:
