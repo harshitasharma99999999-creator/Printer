@@ -1,8 +1,14 @@
-"""Publish an Instagram Reel or create a complete manual-post fallback package."""
+"""Publish an Instagram Reel or create a complete manual-post fallback package.
+
+Supported providers:
+- Official Meta Graph API (recommended and safest)
+- instagrapi private API fallback (risky; may trigger checkpoints/account locks)
+"""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import time
@@ -110,8 +116,78 @@ def publish(video_path: Path, content_path: Path) -> dict[str, Any]:
     permalink_response.raise_for_status()
     return {
         "status": "uploaded",
+        "provider": "meta_graph",
         "media_id": media_id,
         "url": permalink_response.json().get("permalink"),
+    }
+
+
+def publish_private_api(video_path: Path, content_path: Path) -> dict[str, Any]:
+    """Upload a Reel through instagrapi.
+
+    This is intentionally isolated from the official Graph API path because it
+    uses Instagram's private mobile API. Use only when the business owner has
+    accepted the operational risk.
+    """
+
+    try:
+        from instagrapi import Client
+        from instagrapi.exceptions import BadPassword, ChallengeRequired, LoginRequired
+    except ImportError as error:
+        raise RuntimeError(
+            "instagrapi is not installed. Run: pip install -r requirements-grand-forno.txt"
+        ) from error
+
+    username = os.getenv("INSTAGRAM_USERNAME", "").strip()
+    password = os.getenv("INSTAGRAM_PASSWORD", "").strip()
+    session_json = os.getenv("INSTAGRAM_SESSION_JSON", "").strip()
+    content = read_json(content_path)
+
+    if not session_json and (not username or not password):
+        raise RuntimeError(
+            "INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD are required when "
+            "INSTAGRAM_SESSION_JSON is unavailable"
+        )
+
+    client = Client()
+    client.delay_range = [2, 5]
+
+    if session_json:
+        try:
+            client.set_settings(json.loads(session_json))
+            client.get_timeline_feed()
+        except Exception:
+            if not username or not password:
+                raise RuntimeError(
+                    "INSTAGRAM_SESSION_JSON is invalid/expired, and username/password "
+                    "were not provided for refresh"
+                )
+            client = Client()
+            client.delay_range = [2, 5]
+            client.set_settings(json.loads(session_json))
+            client.login(username, password)
+    else:
+        try:
+            client.login(username, password)
+        except ChallengeRequired as error:
+            raise RuntimeError(
+                "Instagram challenge/checkpoint required. Run scripts/gen_instagram_session.py "
+                "locally, complete the verification, then save INSTAGRAM_SESSION_JSON as a "
+                "GitHub secret."
+            ) from error
+        except BadPassword as error:
+            raise RuntimeError("Instagram password rejected") from error
+        except LoginRequired as error:
+            raise RuntimeError("Instagram login required but failed") from error
+
+    media = client.clip_upload(video_path, content["caption"])
+    code = getattr(media, "code", None)
+    media_id = getattr(media, "id", None) or getattr(media, "pk", None)
+    return {
+        "status": "uploaded",
+        "provider": "instagrapi_private_api",
+        "media_id": str(media_id) if media_id else None,
+        "url": f"https://www.instagram.com/reel/{code}/" if code else None,
     }
 
 
@@ -120,19 +196,51 @@ def post_or_package(
 ) -> dict[str, Any]:
     if os.getenv("INSTAGRAM_MODE", "auto").lower() == "manual":
         return manual_package(video_path, content_path, manual_dir, "INSTAGRAM_MODE=manual")
-    if not os.getenv("INSTAGRAM_ACCESS_TOKEN") or not os.getenv("INSTAGRAM_ACCOUNT_ID"):
+
+    provider = os.getenv("INSTAGRAM_PROVIDER", "").strip().lower()
+    if not provider:
+        if os.getenv("INSTAGRAM_ACCESS_TOKEN") and os.getenv("INSTAGRAM_ACCOUNT_ID"):
+            provider = "meta_graph"
+        elif (
+            os.getenv("INSTAGRAM_SESSION_JSON")
+            or (os.getenv("INSTAGRAM_USERNAME") and os.getenv("INSTAGRAM_PASSWORD"))
+        ):
+            provider = "instagrapi"
+
+    if provider in {"instagrapi", "private", "private_api"}:
+        try:
+            return publish_private_api(video_path, content_path)
+        except Exception as error:
+            return manual_package(
+                video_path,
+                content_path,
+                manual_dir,
+                f"Instagram private API auto-publish failed: {type(error).__name__}: {error}",
+            )
+
+    if provider in {"meta_graph", "graph", "official"}:
+        if not os.getenv("INSTAGRAM_ACCESS_TOKEN") or not os.getenv("INSTAGRAM_ACCOUNT_ID"):
+            return manual_package(
+                video_path, content_path, manual_dir, "Instagram Graph credentials are unavailable"
+            )
+        try:
+            return publish(video_path, content_path)
+        except Exception as error:
+            return manual_package(
+                video_path,
+                content_path,
+                manual_dir,
+                f"Instagram auto-publish failed: {type(error).__name__}: {error}",
+            )
+
+    if not provider:
         return manual_package(
             video_path, content_path, manual_dir, "Instagram credentials are unavailable"
         )
-    try:
-        return publish(video_path, content_path)
-    except Exception as error:
-        return manual_package(
-            video_path,
-            content_path,
-            manual_dir,
-            f"Instagram auto-publish failed: {type(error).__name__}: {error}",
-        )
+
+    return manual_package(
+        video_path, content_path, manual_dir, f"Unsupported INSTAGRAM_PROVIDER={provider}"
+    )
 
 
 def main() -> None:

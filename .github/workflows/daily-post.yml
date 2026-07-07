@@ -37,9 +37,13 @@ jobs:
       INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
       INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
       INSTAGRAM_GRAPH_VERSION: v23.0
-      # Manual until the disabled Facebook developer account is recovered.
-      # Change to "auto" after Graph API credentials are configured.
-      INSTAGRAM_MODE: manual
+      # Preferred: meta_graph. Last-resort fallback: instagrapi private API.
+      # The private API can trigger checkpoints or account lockouts.
+      INSTAGRAM_PROVIDER: instagrapi
+      INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
+      INSTAGRAM_PASSWORD: ${{ secrets.INSTAGRAM_PASSWORD }}
+      INSTAGRAM_SESSION_JSON: ${{ secrets.INSTAGRAM_SESSION_JSON }}
+      INSTAGRAM_MODE: auto
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       ALLOW_GENERATION_FALLBACK: ${{ inputs.dry_run || 'false' }}
 
@@ -73,6 +77,12 @@ jobs:
               missing=1
             fi
           done
+          if [ "${INSTAGRAM_PROVIDER}" = "instagrapi" ]; then
+            if [ -z "${INSTAGRAM_SESSION_JSON}" ] && { [ -z "${INSTAGRAM_USERNAME}" ] || [ -z "${INSTAGRAM_PASSWORD}" ]; }; then
+              echo "::error::For Instagram private API posting, set INSTAGRAM_SESSION_JSON or both INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD"
+              missing=1
+            fi
+          fi
           exit "$missing"
 
       - name: Generate and publish

@@ -5,3 +5,4 @@ google-auth-oauthlib==1.2.2
 Pillow==11.3.0
 python-dotenv==1.1.1
 requests==2.32.4
+instagrapi==2.2.1

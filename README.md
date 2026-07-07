@@ -11,16 +11,19 @@ At 7:00 PM India time every day, `.github/workflows/daily-post.yml`:
 1. Picks the least recently posted item from `data/menu_items.json`.
 2. Generates safe sales copy and metadata with the OpenAI Responses API.
 3. Generates Indian-English narration with ElevenLabs.
-4. Requests a realistic vertical female presenter from HeyGen.
+4. Uses the configured presenter mode: HeyGen when paid avatar credits are
+   available, or the free branded presenter/visual fallback.
 5. Renders a 1080×1920, 20–35 second MP4 with FFmpeg, product imagery,
    burned-in subtitles, benefits, branding, CTA, and order-link end screen.
-6. Uploads through YouTube Data API `videos.insert` and Instagram Graph API.
+6. Uploads through YouTube Data API `videos.insert` and Instagram. Instagram
+   uses the official Graph API when configured; this repo also includes an
+   accepted-risk `instagrapi` fallback for accounts blocked from Meta setup.
 7. Commits platform results and uploaded links to `data/post_history.json` and
    timestamped JSONL files in `logs/`.
 
-If Instagram permissions, account eligibility, or publishing fail, the workflow
-still succeeds for Instagram by saving `grand-forno-reel.mp4`, `caption.txt`,
-and `manual-post.json` in the workflow artifact under
+If Instagram permissions, account eligibility, checkpoints, or publishing fail,
+the workflow still succeeds for YouTube and saves `grand-forno-reel.mp4`,
+`caption.txt`, and `manual-post.json` in the workflow artifact under
 `output/<run-id>/instagram-manual/`.
 
 ## Repository layout
@@ -58,8 +61,11 @@ Fork or push this repository to GitHub, then enable Actions. In
 | `YOUTUBE_CLIENT_ID` | Google OAuth client |
 | `YOUTUBE_CLIENT_SECRET` | Google OAuth client |
 | `YOUTUBE_REFRESH_TOKEN` | Refresh token with `youtube.upload` scope |
-| `INSTAGRAM_ACCESS_TOKEN` | Long-lived Meta token; optional for manual fallback |
-| `INSTAGRAM_ACCOUNT_ID` | Instagram professional account ID; optional for fallback |
+| `INSTAGRAM_ACCESS_TOKEN` | Long-lived Meta token for official Graph API; optional when private fallback is used |
+| `INSTAGRAM_ACCOUNT_ID` | Instagram professional account ID for official Graph API; optional when private fallback is used |
+| `INSTAGRAM_USERNAME` | Last-resort private API fallback username |
+| `INSTAGRAM_PASSWORD` | Last-resort private API fallback password |
+| `INSTAGRAM_SESSION_JSON` | Preferred private API session JSON after local verification |
 
 Under the adjacent **Variables** tab add:
 
@@ -68,10 +74,34 @@ Under the adjacent **Variables** tab add:
 | `AVATAR_ID` | A realistic female presenter/avatar ID available to the HeyGen account |
 | `VOICE_ID` | ElevenLabs voice ID; optional, defaults locally to a female voice |
 
-The Instagram account must be a Business or Creator account connected to a
-Facebook Page, and the token needs the current content-publishing permissions.
-Use a long-lived token and renew it before expiry. Instagram upload is binary
-and resumable; no public video host is required.
+Recommended Instagram setup is still the official Meta Graph API: the Instagram
+account must be a Business or Creator account connected to a Facebook Page, and
+the token needs the current content-publishing permissions. Use a long-lived
+token and renew it before expiry. Instagram upload is binary and resumable; no
+public video host is required.
+
+Because Grand Forno's Facebook account is currently disabled, the workflow is
+configured for the private API fallback with:
+
+```yaml
+INSTAGRAM_PROVIDER: instagrapi
+INSTAGRAM_MODE: auto
+```
+
+This fallback is unofficial and can trigger Instagram checkpoints, temporary
+locks, or account disablement. For the safest private fallback, generate a
+verified session on your own computer:
+
+```powershell
+pip install instagrapi
+python scripts/gen_instagram_session.py
+```
+
+Complete any OTP/challenge that Instagram asks for, then save the produced JSON
+as the `INSTAGRAM_SESSION_JSON` GitHub secret. If you skip session JSON, the
+workflow can use `INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`, but that is more
+likely to trigger a checkpoint from GitHub's servers. Never paste passwords into
+chat or commit them to Git.
 
 For YouTube, enable YouTube Data API v3 in Google Cloud, configure OAuth
 consent, and generate a refresh token for the channel with
@@ -114,6 +144,10 @@ India does not observe daylight saving time.
 - Copy validation rejects unsafe phrases and requires both exact ordering URLs
   and all required hashtags.
 - Set `INSTAGRAM_MODE=manual` to force the manual package.
+- Set `INSTAGRAM_PROVIDER=meta_graph` when the Facebook/Meta account is
+  recovered and official Instagram publishing credentials are ready.
+- Set `INSTAGRAM_PROVIDER=instagrapi` only for the accepted-risk private API
+  fallback.
 - Set `AVATAR_MODE=visual` to use the branded fruit-visual fallback without
   consuming HeyGen credits; use `auto` to enable the realistic presenter.
 - Live Actions disable generation fallbacks so a missing voice/avatar cannot
