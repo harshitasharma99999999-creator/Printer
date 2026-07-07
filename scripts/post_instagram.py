@@ -210,7 +210,8 @@ def _upload_post_result(payload: dict[str, Any]) -> dict[str, Any]:
 
     if isinstance(instagram, dict):
         success = instagram.get("success")
-        if success is False:
+        raw_status = str(instagram.get("status") or instagram.get("message") or "").lower()
+        if success is False and raw_status not in {"queued", "processing", "pending", "submitted"}:
             raise RuntimeError(f"Upload-Post Instagram upload failed: {instagram}")
         url = (
             instagram.get("url")
@@ -304,7 +305,11 @@ def publish_upload_post(video_path: Path, content_path: Path) -> dict[str, Any]:
             files={"video": (video_path.name, handle, "video/mp4")},
             timeout=600,
         )
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise RuntimeError(
+            "Upload-Post upload request failed "
+            f"with HTTP {response.status_code}: {response.text[:1000]}"
+        )
     payload = response.json()
     result = _upload_post_result(payload)
     result["request_id"] = result.get("request_id") or request_id
