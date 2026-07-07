@@ -1,0 +1,8 @@
+{"timestamp": "2026-07-07T07:26:12+00:00", "event": "run_started", "run_id": "20260707T072612Z", "dry_run": false, "allow_fallback": false}
+{"timestamp": "2026-07-07T07:26:12+00:00", "event": "item_selected", "item_id": "berry-blast-protein-bowl", "item_name": "Berry Blast Protein Bowl"}
+{"timestamp": "2026-07-07T07:26:15+00:00", "event": "copy_generated", "title": "Berry Blast Protein Bowl | Grand Forno #Shorts"}
+{"timestamp": "2026-07-07T07:26:20+00:00", "event": "voice_generated", "path": "output/20260707T072612Z/narration.mp3"}
+{"timestamp": "2026-07-07T07:26:46+00:00", "event": "video_generated", "duration_seconds": 26.05, "avatar_status": "fallback (visual mode configured)"}
+{"timestamp": "2026-07-07T07:26:48+00:00", "event": "youtube_complete", "result": {"status": "uploaded", "video_id": "itzO7B-7UQI", "url": "https://www.youtube.com/shorts/itzO7B-7UQI"}}
+{"timestamp": "2026-07-07T07:27:01+00:00", "event": "instagram_complete", "result": {"status": "manual_required", "reason": "Instagram private API auto-publish failed: RuntimeError: Instagram password rejected", "package": "/home/runner/work/Printer/Printer/output/20260707T072612Z/instagram-manual", "url": null}}
+{"timestamp": "2026-07-07T07:27:01+00:00", "event": "run_complete", "youtube": {"status": "uploaded", "video_id": "itzO7B-7UQI", "url": "https://www.youtube.com/shorts/itzO7B-7UQI"}, "instagram": {"status": "manual_required", "reason": "Instagram private API auto-publish failed: RuntimeError: Instagram password rejected", "package": "/home/runner/work/Printer/Printer/output/20260707T072612Z/instagram-manual", "url": null}}
