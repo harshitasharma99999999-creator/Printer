@@ -12,7 +12,6 @@ import requests
 
 from grand_forno_common import (
     HASHTAGS,
-    ROOT,
     SWIGGY_URL,
     ZOMATO_URL,
     read_json,
@@ -25,21 +24,21 @@ def fallback_content(item: dict[str, Any]) -> dict[str, Any]:
     ingredients = ", ".join(item["ingredients"][:4])
     benefits = ", ".join(item["benefits"])
     script = (
-        f"Looking for a fresh and satisfying bowl? Try Grand Forno's {item['name']}. "
-        f"It brings together {ingredients}, with a delicious premium finish. "
-        f"It is {benefits}, and made for busy Mumbai days. "
-        f"You get a {item['serving_size']} serving with {item['protein']} of protein "
-        f"for {item['price']}. Order Grand Forno now on Zomato or Swiggy!"
+        f"If you want something fresh without making it feel like a heavy meal, "
+        f"Grand Forno's {item['name']} is a lovely pick. "
+        f"You get {ingredients}, packed neatly into a colourful {item['serving_size']} bowl. "
+        f"It is {benefits}, with {item['protein']} protein and around {item['calories']} calories. "
+        f"Simple, refreshing, and easy to order on Zomato or Swiggy."
     )
     caption = (
-        f"Fresh, colourful and ready when you are. Try Grand Forno's {item['name']} — "
-        f"{benefits} and made with fresh fruits. 🍓🥭\n\n"
+        f"Fresh fruit, clean flavours, and a bowl that feels good for busy days. "
+        f"Try Grand Forno's {item['name']} — {benefits}, made with fresh fruits.\n\n"
         f"Order Grand Forno on Zomato:\n{ZOMATO_URL}\n\n"
         f"Order on Swiggy:\n{SWIGGY_URL}\n\n{HASHTAGS}"
     )
     return {
         "script": script,
-        "title": f"{item['name']} at Grand Forno 🥭 #Shorts",
+        "title": f"{item['name']} at Grand Forno #Shorts",
         "caption": caption,
         "hashtags": HASHTAGS.split(),
         "benefit_overlays": item["benefits"][:3],
@@ -68,8 +67,14 @@ def generate_with_openai(item: dict[str, Any]) -> dict[str, Any]:
     }
     instructions = (
         "You write short-form food ads for Grand Forno, a Mumbai cloud kitchen. "
-        "Use a friendly, natural Indian food-delivery tone. Write narration for 20-30 seconds, "
-        "roughly 65-85 words. Be concise and sales-focused. Use only supplied facts. "
+        "Use a friendly, natural Indian food-delivery tone that feels like a real food creator "
+        "or small restaurant owner speaking, not a generic AI advertisement. Write narration "
+        "for 20-30 seconds, roughly 60-82 words. Be concise, warm, and sales-focused. "
+        "Make it appealing to health-conscious customers: fresh fruit, light meal, clean flavours, "
+        "protein or fiber where supplied, busy-day convenience, and satisfying texture. "
+        "Use one concrete sensory detail from the ingredients, such as creamy yogurt, juicy fruit, "
+        "crunchy seeds, bright berries, or chilled fresh fruit. Use only supplied facts. "
+        "Avoid robotic phrases, over-polished hype, fake urgency, excessive emojis, and repeated lines. "
         "Never promise cures, guaranteed weight loss, disease prevention, or medical benefits. "
         "Safe phrases include protein-rich, refreshing, fiber-rich, supports digestion, "
         "healthy choice, energy boosting, and made with fresh fruits. "
