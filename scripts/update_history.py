@@ -24,6 +24,7 @@ def update_history(
         "item_id": content["item"]["id"],
         "item_name": content["item"]["name"],
         "title": content["title"],
+        "creative_angle": content.get("creative_angle"),
         "youtube": youtube,
         "instagram": instagram,
     }

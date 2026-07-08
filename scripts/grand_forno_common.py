@@ -69,19 +69,36 @@ def validate_marketing_copy(content: dict[str, Any]) -> None:
         raise ValueError(f"Caption is missing required content: {', '.join(missing)}")
 
 
-def select_next_item(menu: list[dict[str, Any]], history: dict[str, Any]) -> dict[str, Any]:
-    """Choose the least recently used item, preserving menu order for ties."""
-    last_used: dict[str, str] = {}
+def successful_posts(history: dict[str, Any]) -> list[dict[str, Any]]:
+    posts = []
     for post in history.get("posts", []):
         youtube_ok = post.get("youtube", {}).get("status") == "uploaded"
         instagram_ok = post.get("instagram", {}).get("status") == "uploaded"
-        if not (youtube_ok or instagram_ok):
-            continue
+        if youtube_ok or instagram_ok:
+            posts.append(post)
+    return posts
+
+
+def select_next_item(menu: list[dict[str, Any]], history: dict[str, Any]) -> dict[str, Any]:
+    """Choose the least recently used item, avoiding recent repeats when possible."""
+    last_used: dict[str, str] = {}
+    posts = successful_posts(history)
+    for post in posts:
         item_id = post.get("item_id")
         created_at = post.get("created_at", "")
         if item_id and created_at > last_used.get(item_id, ""):
             last_used[item_id] = created_at
-    return min(menu, key=lambda item: (last_used.get(item["id"], ""), menu.index(item)))
+
+    recent_window = int(os.getenv("GRAND_FORNO_NO_REPEAT_WINDOW", str(max(1, len(menu) - 1))))
+    recent_ids = {
+        post.get("item_id")
+        for post in posts[-recent_window:]
+        if post.get("item_id")
+    }
+    eligible = [item for item in menu if item["id"] not in recent_ids]
+    if not eligible:
+        eligible = menu
+    return min(eligible, key=lambda item: (last_used.get(item["id"], ""), menu.index(item)))
 
 
 def require_env(*names: str) -> None:

@@ -166,6 +166,10 @@ India does not observe daylight saving time.
 
 - Menu claims come from `data/menu_items.json`; review calories, protein,
   serving sizes, and prices before launch.
+- Item selection avoids recent repeats using `GRAND_FORNO_NO_REPEAT_WINDOW`
+  (default `4`, so with five menu items it rotates through the menu before
+  returning to an item). When an item eventually cycles back, the copy generator
+  uses a different creative angle so the post is not a duplicate.
 - Copy validation rejects unsafe phrases and requires both exact ordering URLs
   and all required hashtags.
 - Set `INSTAGRAM_MODE=manual` to force the manual package.

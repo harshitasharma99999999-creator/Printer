@@ -67,7 +67,7 @@ def run(dry_run: bool, allow_fallback: bool) -> dict[str, Any]:
     append_event(log_path, "item_selected", item_id=item["id"], item_name=item["name"])
 
     content_path = run_dir / "content.json"
-    content = generate(item, allow_fallback)
+    content = generate(item, allow_fallback, history)
     write_json(content_path, content)
     append_event(log_path, "copy_generated", title=content["title"])
 
