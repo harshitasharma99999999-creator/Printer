@@ -1,0 +1,8 @@
+{"timestamp": "2026-07-09T16:13:44+00:00", "event": "run_started", "run_id": "20260709T161344Z", "dry_run": false, "allow_fallback": false}
+{"timestamp": "2026-07-09T16:13:44+00:00", "event": "item_selected", "item_id": "healthy-fruit-bowl", "item_name": "Healthy Fruit Bowl"}
+{"timestamp": "2026-07-09T16:13:47+00:00", "event": "copy_generated", "title": "Healthy Fruit Bowl | Fresh & Light | Grand Forno #Shorts"}
+{"timestamp": "2026-07-09T16:13:52+00:00", "event": "voice_generated", "path": "output/20260709T161344Z/narration.mp3"}
+{"timestamp": "2026-07-09T16:14:22+00:00", "event": "video_generated", "duration_seconds": 28.35, "avatar_status": "fallback (visual mode configured)", "product_visual": "assets/product_images/healthy-fruit-bowl.png", "background_music": "assets/music/fresh-upbeat-loop.wav"}
+{"timestamp": "2026-07-09T16:14:24+00:00", "event": "youtube_complete", "result": {"status": "uploaded", "video_id": "FaQ27j20Y2U", "url": "https://www.youtube.com/shorts/FaQ27j20Y2U"}}
+{"timestamp": "2026-07-09T16:15:12+00:00", "event": "instagram_complete", "result": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/DalBVs8iYoC/", "raw_status": null, "request_id": "19eeed00-f7cc-4f7f-a5df-78a812bc4d7e"}}
+{"timestamp": "2026-07-09T16:15:12+00:00", "event": "run_complete", "youtube": {"status": "uploaded", "video_id": "FaQ27j20Y2U", "url": "https://www.youtube.com/shorts/FaQ27j20Y2U"}, "instagram": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/DalBVs8iYoC/", "raw_status": null, "request_id": "19eeed00-f7cc-4f7f-a5df-78a812bc4d7e"}}
