@@ -1,0 +1,8 @@
+{"timestamp": "2026-07-11T14:36:43+00:00", "event": "run_started", "run_id": "20260711T143643Z", "dry_run": false, "allow_fallback": false}
+{"timestamp": "2026-07-11T14:36:43+00:00", "event": "item_selected", "item_id": "classic-mixed-fruit-salad", "item_name": "Classic Mixed Fruit Salad"}
+{"timestamp": "2026-07-11T14:36:47+00:00", "event": "copy_generated", "title": "Classic Mixed Fruit Salad | Fresh & Light | Grand Forno #Shorts"}
+{"timestamp": "2026-07-11T14:36:52+00:00", "event": "voice_generated", "path": "output/20260711T143643Z/narration.mp3"}
+{"timestamp": "2026-07-11T14:37:22+00:00", "event": "video_generated", "duration_seconds": 29.34, "avatar_status": "fallback (visual mode configured)", "product_visual": "assets/product_images/classic-mixed-fruit-salad.png", "background_music": "assets/music/fresh-upbeat-loop.wav"}
+{"timestamp": "2026-07-11T14:37:23+00:00", "event": "youtube_complete", "result": {"status": "uploaded", "video_id": "MdFq6bfTwow", "url": "https://www.youtube.com/shorts/MdFq6bfTwow"}}
+{"timestamp": "2026-07-11T14:38:58+00:00", "event": "instagram_complete", "result": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/Dap_6ETje4Y/", "raw_status": null, "request_id": "2437be4d-d78f-4ac4-9151-bc847cf122f3"}}
+{"timestamp": "2026-07-11T14:38:58+00:00", "event": "run_complete", "youtube": {"status": "uploaded", "video_id": "MdFq6bfTwow", "url": "https://www.youtube.com/shorts/MdFq6bfTwow"}, "instagram": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/Dap_6ETje4Y/", "raw_status": null, "request_id": "2437be4d-d78f-4ac4-9151-bc847cf122f3"}}
