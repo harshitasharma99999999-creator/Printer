@@ -1,0 +1,19 @@
+{
+  "run_id": "20260720T153051Z",
+  "created_at": "2026-07-20T15:31:34+00:00",
+  "item_id": "dragon-fruit-protein-bowl",
+  "item_name": "Dragon Fruit Protein Bowl",
+  "title": "Dragon Fruit Protein Bowl | Chilled & Colourful | #Shorts",
+  "creative_angle": "cool refreshing craving",
+  "youtube": {
+    "status": "uploaded",
+    "video_id": "_xajfpNjy7Y",
+    "url": "https://www.youtube.com/shorts/_xajfpNjy7Y"
+  },
+  "instagram": {
+    "status": "manual_required",
+    "reason": "Upload-Post Instagram auto-publish failed: RuntimeError: Upload-Post upload request failed with HTTP 400: {\"success\":false,\"message\":\"Username not associated with any profile\"}\n",
+    "package": "/home/runner/work/Printer/Printer/output/20260720T153051Z/instagram-manual",
+    "url": null
+  }
+}
