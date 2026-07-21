@@ -16,9 +16,13 @@ load_dotenv(ROOT / ".env")
 
 ZOMATO_URL = "https://zomato.onelink.me/xqzv/w36rgxfb"
 SWIGGY_URL = "https://www.swiggy.com/menu/1308871?source=sharing"
+BRAND_NAME = os.getenv("CONTENT_BRAND_NAME", "Fresh HVN").strip() or "Fresh HVN"
+DIRECT_ORDER_PHONE = os.getenv("DIRECT_ORDER_PHONE", "7045027768").strip()
+DIRECT_ORDER_CONTACT = DIRECT_ORDER_PHONE or "the number in bio"
+WHATSAPP_CTA = f"WhatsApp or call {DIRECT_ORDER_CONTACT} to order directly from {BRAND_NAME}."
 HASHTAGS = (
-    "#GrandForno #FruitSalad #HealthyFood #HealthyBowl #Zomato #Swiggy "
-    "#MumbaiFood #CloudKitchen #ProteinBowl #FreshFruits"
+    "#FreshHVN #FreshJuice #Smoothies #HealthyDrinks #JuiceLovers "
+    "#MumbaiFood #MumbaiFoodies #Beverages #FreshFruits #WhatsAppOrders"
 )
 UNSAFE_CLAIMS = (
     "cure",
@@ -63,10 +67,48 @@ def validate_marketing_copy(content: dict[str, Any]) -> None:
         raise ValueError(f"Unsafe marketing claim(s) generated: {', '.join(found)}")
 
     caption = str(content.get("caption", ""))
-    required = [ZOMATO_URL, SWIGGY_URL, *HASHTAGS.split()]
+    required = [WHATSAPP_CTA, *HASHTAGS.split()]
     missing = [value for value in required if value not in caption]
     if missing:
         raise ValueError(f"Caption is missing required content: {', '.join(missing)}")
+
+    blocked = [
+        value
+        for value in (
+            "Order Grand Forno on Zomato",
+            "Order Fresh HVN on Zomato",
+            "Order on Zomato",
+            "Zomato:",
+            ZOMATO_URL,
+            "Order on Swiggy",
+            "Swiggy:",
+            "Swiggy",
+            SWIGGY_URL,
+        )
+        if value in caption
+    ]
+    if blocked:
+        raise ValueError(
+            "Instagram/direct-order caption must not promote aggregator ordering: "
+            + ", ".join(blocked)
+        )
+
+    sensitive_reasons = (
+        "commission",
+        "commissions",
+        "platform charge",
+        "platform charges",
+        "platform fee",
+        "platform fees",
+        "cut out",
+        "avoid platform",
+    )
+    found_reasons = [value for value in sensitive_reasons if value in caption.lower()]
+    if found_reasons:
+        raise ValueError(
+            "Caption should not mention aggregator commissions or platform charges: "
+            + ", ".join(found_reasons)
+        )
 
 
 def successful_posts(history: dict[str, Any]) -> list[dict[str, Any]]:

@@ -21,6 +21,25 @@ import requests
 
 from grand_forno_common import read_json, write_json
 
+TARGET_INSTAGRAM_HANDLE = "fresh_hvn"
+
+
+def assert_fresh_hvn_target() -> None:
+    """Fail closed when an explicit Instagram account points somewhere else."""
+
+    expected = os.getenv("INSTAGRAM_TARGET_HANDLE", TARGET_INSTAGRAM_HANDLE).strip().lstrip("@")
+    if expected.lower() != TARGET_INSTAGRAM_HANDLE:
+        raise RuntimeError(
+            f"INSTAGRAM_TARGET_HANDLE must be {TARGET_INSTAGRAM_HANDLE}, got {expected}"
+        )
+
+    for name in ("INSTAGRAM_USERNAME", "UPLOAD_POST_USER"):
+        value = os.getenv(name, "").strip().lstrip("@")
+        if value and value.lower() != TARGET_INSTAGRAM_HANDLE:
+            raise RuntimeError(
+                f"{name} is @{value}, but this automation may only post to @{TARGET_INSTAGRAM_HANDLE}"
+            )
+
 
 def manual_package(
     video_path: Path, content_path: Path, manual_dir: Path, reason: str
@@ -35,7 +54,7 @@ def manual_package(
         manual_dir / "manual-post.json",
         {
             "reason": reason,
-            "instagram_account": "grand_forno",
+            "instagram_account": "fresh_hvn",
             "video": video_copy.name,
             "caption": "caption.txt",
         },
@@ -326,6 +345,8 @@ def publish_upload_post(video_path: Path, content_path: Path) -> dict[str, Any]:
 def post_or_package(
     video_path: Path, content_path: Path, manual_dir: Path
 ) -> dict[str, Any]:
+    assert_fresh_hvn_target()
+
     if os.getenv("INSTAGRAM_MODE", "auto").lower() == "manual":
         return manual_package(video_path, content_path, manual_dir, "INSTAGRAM_MODE=manual")
 
