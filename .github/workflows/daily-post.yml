@@ -1,41 +1,40 @@
-name: Grand Forno Daily Reel and Short
+name: Legacy Daily Reel and Short Disabled
 
 on:
-  schedule:
-    # 19:00 Asia/Kolkata (IST is UTC+05:30 and has no daylight saving time).
-    - cron: "30 13 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Render and package content without publishing
+        description: Disabled legacy workflow; use Fresh HVN Daily Beverage Posts instead
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
 
 concurrency:
-  group: grand-forno-daily-post
+  group: fresh-hvn-legacy-daily-post-disabled
   cancel-in-progress: false
 
 jobs:
   create-and-publish:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: gpt-5.4-mini
-      VOICE_API_KEY: ${{ secrets.VOICE_API_KEY }}
-      VOICE_ID: ${{ vars.VOICE_ID }}
-      AVATAR_API_KEY: ${{ secrets.AVATAR_API_KEY }}
-      AVATAR_ID: ${{ vars.AVATAR_ID }}
       AVATAR_MODE: visual
+      BACKGROUND_MUSIC_PATH: assets/music/fresh-upbeat-loop.wav
+      BACKGROUND_MUSIC_VOLUME: "0.85"
+      MUSIC_ONLY_DURATION_SECONDS: "28"
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      YOUTUBE_TARGET_HANDLE: "@fresh_hvn"
       YOUTUBE_PRIVACY_STATUS: public
       INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
       INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+      INSTAGRAM_TARGET_HANDLE: fresh_hvn
       INSTAGRAM_GRAPH_VERSION: v23.0
       # Preferred official paths: meta_graph or upload_post. Last-resort: instagrapi.
       INSTAGRAM_PROVIDER: upload_post
@@ -73,12 +72,32 @@ jobs:
         shell: bash
         run: |
           missing=0
-          for name in OPENAI_API_KEY VOICE_API_KEY YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET YOUTUBE_REFRESH_TOKEN; do
+          for name in OPENAI_API_KEY YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET YOUTUBE_REFRESH_TOKEN BACKGROUND_MUSIC_PATH; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for a live run"
               missing=1
             fi
           done
+          if [ "${YOUTUBE_TARGET_HANDLE}" != "@fresh_hvn" ]; then
+            echo "::error::YOUTUBE_TARGET_HANDLE must be @fresh_hvn"
+            missing=1
+          fi
+          if [ "${INSTAGRAM_TARGET_HANDLE}" != "fresh_hvn" ]; then
+            echo "::error::INSTAGRAM_TARGET_HANDLE must be fresh_hvn"
+            missing=1
+          fi
+          if [ -n "${INSTAGRAM_USERNAME}" ] && [ "${INSTAGRAM_USERNAME#@}" != "fresh_hvn" ]; then
+            echo "::error::INSTAGRAM_USERNAME must be fresh_hvn"
+            missing=1
+          fi
+          if [ -n "${UPLOAD_POST_USER}" ] && [ "${UPLOAD_POST_USER#@}" != "fresh_hvn" ]; then
+            echo "::error::UPLOAD_POST_USER must be fresh_hvn"
+            missing=1
+          fi
+          if [ ! -s "${BACKGROUND_MUSIC_PATH}" ]; then
+            echo "::error::BACKGROUND_MUSIC_PATH must point to an approved licensed English trending-style song listed in assets/music/trending_songs.json"
+            missing=1
+          fi
           if [ "${INSTAGRAM_PROVIDER}" = "instagrapi" ]; then
             if [ -z "${INSTAGRAM_SESSION_JSON}" ] && { [ -z "${INSTAGRAM_USERNAME}" ] || [ -z "${INSTAGRAM_PASSWORD}" ]; }; then
               echo "::error::For Instagram private API posting, set INSTAGRAM_SESSION_JSON or both INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD"
@@ -100,11 +119,11 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          git config user.name "grand-forno-bot"
+          git config user.name "fresh-hvn-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/post_history.json logs/
           if ! git diff --cached --quiet; then
-            git commit -m "Update Grand Forno post history"
+            git commit -m "Update Fresh HVN post history"
             git pull --rebase origin "${GITHUB_REF_NAME}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
@@ -113,7 +132,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: grand-forno-${{ github.run_id }}
+          name: fresh-hvn-legacy-${{ github.run_id }}
           path: |
             output/
             logs/
