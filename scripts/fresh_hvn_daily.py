@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import generate_video
+from create_social_post_pack import create_pack
 from generate_script import generate
 from grand_forno_common import ROOT, read_json, write_json
 
@@ -90,10 +91,12 @@ def main() -> None:
     selected_path = run_dir / "selected_item.json"
     content_path = run_dir / "content.json"
     video_path = run_dir / "fresh-hvn-short.mp4"
+    social_pack_dir = run_dir / "social-pack"
     write_json(selected_path, item)
     content = generate(item, allow_fallback=True, history=history)
     write_json(content_path, content)
     video_metadata = generate_video.render(content_path, None, video_path, allow_fallback=True)
+    social_pack = create_pack(video_path, content_path, social_pack_dir)
 
     result: dict[str, Any] = {
         "run_id": run_id,
@@ -102,6 +105,8 @@ def main() -> None:
         "content": str(content_path.relative_to(ROOT)),
         "video": str(video_path.relative_to(ROOT)),
         "video_metadata": video_metadata,
+        "social_pack": str(social_pack_dir.relative_to(ROOT)),
+        "social_platforms": social_pack["platforms"],
         "instagram": {"status": "skipped"},
         "youtube": {"status": "skipped"},
     }
