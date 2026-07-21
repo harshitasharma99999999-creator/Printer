@@ -19,7 +19,9 @@ SWIGGY_URL = "https://www.swiggy.com/menu/1308871?source=sharing"
 BRAND_NAME = os.getenv("CONTENT_BRAND_NAME", "Fresh HVN").strip() or "Fresh HVN"
 DIRECT_ORDER_PHONE = os.getenv("DIRECT_ORDER_PHONE", "7045027768").strip()
 DIRECT_ORDER_CONTACT = DIRECT_ORDER_PHONE or "the number in bio"
-WHATSAPP_CTA = f"WhatsApp or call {DIRECT_ORDER_CONTACT} to order directly from {BRAND_NAME}."
+WHATSAPP_CTA = (
+    f"Order on {DIRECT_ORDER_CONTACT} - WhatsApp or call directly for {BRAND_NAME}."
+)
 HASHTAGS = (
     "#FreshHVN #FreshJuice #Smoothies #HealthyDrinks #JuiceLovers "
     "#MumbaiFood #MumbaiFoodies #Beverages #FreshFruits #WhatsAppOrders"

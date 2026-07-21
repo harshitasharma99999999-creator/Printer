@@ -100,7 +100,7 @@ def fallback_content(item: dict[str, Any], history: dict[str, Any] | None = None
         f"{angle['hook']}, "
         f"{BRAND_NAME}'s {item['name']} brings {ingredients} into one fresh {item['serving_size']} serving. "
         f"It is {benefits}, with {item['protein']} protein, around {item['calories']} calories, and the same menu price as Zomato - {item['price']}. "
-        f"Order directly by WhatsApp or call {DIRECT_ORDER_CONTACT}."
+        f"Order on {DIRECT_ORDER_CONTACT}."
     )
     caption = (
         f"{angle['caption_lead']} "
@@ -161,6 +161,7 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
         "Do not mention platform fees, commissions, aggregator charges, or cutting out delivery apps. "
         "Frame direct ordering as quick confirmation, easy custom coordination, and personal service. "
         "It may say the direct price is the same as Zomato. "
+        f"The caption MUST include the exact phrase: Order on {DIRECT_ORDER_CONTACT}. "
         "The caption MUST contain every exact hashtag provided in the input and the exact WhatsApp/call CTA. "
         "The YouTube title must be at most 100 characters and include #Shorts."
     )
@@ -193,7 +194,7 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
             "same menu price as Zomato",
             "serving_size",
             "protein when available",
-            "WhatsApp or call direct ordering",
+            f"Order on {DIRECT_ORDER_CONTACT}",
             "office, party, repeat, or group order use case",
         ],
     }
