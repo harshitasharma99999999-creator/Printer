@@ -207,7 +207,7 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
             "text": {
                 "format": {
                     "type": "json_schema",
-                    "name": "grand_forno_post",
+                    "name": "fresh_hvn_post",
                     "strict": True,
                     "schema": schema,
                 }

@@ -45,7 +45,7 @@ def manual_package(
     video_path: Path, content_path: Path, manual_dir: Path, reason: str
 ) -> dict[str, Any]:
     manual_dir.mkdir(parents=True, exist_ok=True)
-    video_copy = manual_dir / "grand-forno-reel.mp4"
+    video_copy = manual_dir / "fresh-hvn-reel.mp4"
     shutil.copy2(video_path, video_copy)
     content = read_json(content_path)
     (manual_dir / "caption.txt").write_text(content["caption"] + "\n", encoding="utf-8")
