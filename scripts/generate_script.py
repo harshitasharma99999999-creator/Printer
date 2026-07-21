@@ -34,10 +34,16 @@ CINEMATIC_AD_STYLES = [
         "visual_direction": "slow-motion can drop, crushed ice explosion, cold droplets, rotating camera, premium reflections",
     },
     {
+        "name": "Fruit Vortex",
+        "hook": "Fresh fruit flies together in slow motion and forms the Fresh HVN can",
+        "caption_lead": "Fruit, motion, ice, and a Fresh HVN can reveal. Built like a beverage ad, made for direct orders.",
+        "visual_direction": "fruit pieces orbit through darkness, liquid ribbons wrap the can, bright splash reveal, premium pack shot",
+    },
+    {
         "name": "Gym Recovery",
-        "hook": "After the final set, the Fresh HVN can opens with a crisp cold snap",
-        "caption_lead": "Your post-workout upgrade: a Fresh HVN drink for gym bags, busy days, and direct orders.",
-        "visual_direction": "gym setting, towel and shaker nearby, macro can tab, ingredients shown, no muscle-building claim",
+        "hook": "A tired gym moment cuts into a Fresh HVN can opening, then an active lifestyle montage",
+        "caption_lead": "From tired to refreshed. A cinematic Fresh HVN gym-transition ad for chilled beverage orders.",
+        "visual_direction": "weak or tired start, cold can opening, lifestyle energy montage, towel and gym bag, no medical or body-transformation claim",
     },
     {
         "name": "Office Refresh",
@@ -58,6 +64,47 @@ CINEMATIC_AD_STYLES = [
         "visual_direction": "ingredient cuts, blending motion, liquid pour, can seal, chilled end card",
     },
 ]
+
+
+def cinematic_storyboard(angle: dict[str, str], item: dict[str, Any]) -> list[dict[str, str]]:
+    name = angle["name"]
+    ingredients = ", ".join(item["ingredients"][:3])
+    if name == "Fruit Explosion":
+        scenes = [
+            ("0-3s", "A single Fresh HVN can in a dark studio, condensation catching the light."),
+            ("3-8s", f"{ingredients} burst outward as fresh juice splashes across the frame."),
+            ("8-16s", "Macro droplets, fruit color trails, and a cold can hero rotation."),
+            ("16-28s", f"End card: {item['name']}, {item['price']}, Order on {DIRECT_ORDER_CONTACT}."),
+        ]
+    elif name == "Ice Drop":
+        scenes = [
+            ("0-3s", "Fresh HVN can falls from darkness in slow motion."),
+            ("3-8s", "Can crashes into crushed ice, cold mist and shards move toward camera."),
+            ("8-16s", f"Close-up of chilled {item['name']} with bright droplets and premium reflections."),
+            ("16-28s", f"End card: same menu price as Zomato - {item['price']}. Order on {DIRECT_ORDER_CONTACT}."),
+        ]
+    elif name == "Fruit Vortex":
+        scenes = [
+            ("0-3s", "Fruit pieces fly through a dark premium studio space."),
+            ("3-8s", "The fruit begins orbiting and forming the Fresh HVN can silhouette."),
+            ("8-16s", f"The can reveal connects to {item['name']} ingredients: {ingredients}."),
+            ("16-28s", f"Clean Fresh HVN pack shot, {item['price']}, Order on {DIRECT_ORDER_CONTACT}."),
+        ]
+    elif name == "Gym Recovery":
+        scenes = [
+            ("0-3s", "A tired post-workout moment with low light and slow movement."),
+            ("3-8s", "Fresh HVN can opens cold, cutting the frame into brighter energy."),
+            ("8-16s", "Healthy lifestyle montage: gym bag, walk, work break, chilled sip."),
+            ("16-28s", f"End card: {item['name']} for gym bags and busy days. Order on {DIRECT_ORDER_CONTACT}."),
+        ]
+    else:
+        scenes = [
+            ("0-3s", "Premium Fresh HVN can reveal with dramatic beverage lighting."),
+            ("3-8s", f"Ingredients in motion: {ingredients}."),
+            ("8-16s", "Cold droplets, ice, fruit color, and quick lifestyle cuts."),
+            ("16-28s", f"End card: {item['name']}, {item['price']}, Order on {DIRECT_ORDER_CONTACT}."),
+        ]
+    return [{"time": timecode, "shot": shot} for timecode, shot in scenes]
 
 
 def item_post_count(item_id: str, history: dict[str, Any] | None) -> int:
@@ -132,6 +179,7 @@ def fallback_content(item: dict[str, Any], history: dict[str, Any] | None = None
         "creative_angle": angle["name"],
         "cinematic_style": angle["name"],
         "visual_direction": angle["visual_direction"],
+        "cinematic_storyboard": cinematic_storyboard(angle, item),
     }
 
 
@@ -249,6 +297,7 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
     content["creative_angle"] = angle["name"]
     content["cinematic_style"] = angle["name"]
     content["visual_direction"] = angle["visual_direction"]
+    content["cinematic_storyboard"] = cinematic_storyboard(angle, item)
     return content
 
 

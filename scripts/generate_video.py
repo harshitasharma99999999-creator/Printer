@@ -14,6 +14,7 @@ from typing import Any
 
 import requests
 
+from fresh_hvn_cinematic_assets import ensure_cinematic_assets, style_slug
 from grand_forno_common import BRAND_NAME, DIRECT_ORDER_CONTACT, ROOT, read_json
 
 FFMPEG = os.getenv("FFMPEG_BINARY") or shutil.which("ffmpeg")
@@ -275,12 +276,21 @@ def render(
     benefits_text = text_dir / "benefits.txt"
     cta_text = text_dir / "cta.txt"
     links_text = text_dir / "links.txt"
+    hook_text = text_dir / "hook.txt"
+    price_text = text_dir / "price.txt"
+    style_text = text_dir / "style.txt"
     item_text.write_text(wrap_label(content["item"]["name"]), encoding="utf-8")
     benefits_text.write_text(
-        "\n".join(f"• {value}" for value in content["benefit_overlays"]),
+        "\n".join(f"- {value}" for value in content["benefit_overlays"]),
         encoding="utf-8",
     )
     cta_text.write_text(f"Order on {DIRECT_ORDER_CONTACT}", encoding="utf-8")
+    hook_text.write_text(str(content.get("cinematic_style", "Fresh HVN")).upper(), encoding="utf-8")
+    price_text.write_text(
+        f"{content['item']['price']} | Same menu price as Zomato",
+        encoding="utf-8",
+    )
+    style_text.write_text(str(content.get("visual_direction", "Cinematic chilled beverage ad")), encoding="utf-8")
     links_text.write_text(
         f"Same menu price as Zomato\n"
         f"Contact: {DIRECT_ORDER_CONTACT}",
@@ -291,6 +301,10 @@ def render(
     if not logo.exists():
         raise RuntimeError("assets/logo.png is required")
     product = find_product_image(content["item"]["id"], allow_fallback=allow_fallback)
+    cinematic_assets = ensure_cinematic_assets()
+    campaign_slug = style_slug(str(content.get("cinematic_style", "")))
+    background = cinematic_assets["backgrounds"][campaign_slug]  # type: ignore[index]
+    can_overlay = cinematic_assets["can"]  # type: ignore[index]
     music = find_background_music()
     if music_only and not music:
         raise RuntimeError(
@@ -301,51 +315,76 @@ def render(
     if not font.exists():
         font = ROOT / "fonts" / "bold_font.ttf"
 
-    command = [FFMPEG, "-y"]
-    if presenter.exists():
-        command += ["-i", str(presenter)]
-    else:
-        command += ["-loop", "1", "-i", str(product)]
+    command = [FFMPEG, "-y", "-loop", "1", "-i", str(background)]
+    next_input = 1
+    narration_input = None
     if not music_only:
         command += ["-i", str(audio_path)]
-    command += ["-i", str(logo), "-loop", "1", "-i", str(product)]
+        narration_input = next_input
+        next_input += 1
+    command += ["-i", str(logo)]
+    logo_input = next_input
+    next_input += 1
+    command += ["-loop", "1", "-i", str(can_overlay)]
+    can_input = next_input
+    next_input += 1
+    music_input = next_input
     if music:
         command += ["-stream_loop", "-1", "-i", str(music)]
 
-    logo_input = 1 if music_only else 2
-    product_input = 2 if music_only else 3
-    music_input = 3 if music_only else 4
     end_start = max(0.0, duration - 5.0)
+    can_y = "520+16*sin(t*2.1)"
+    can_x = "W-w-45+10*sin(t*1.2)"
+    if campaign_slug == "ice-drop":
+        can_y = "if(lt(t,1.35),-h+((520+h)/1.35)*t,520+18*sin(t*2.4))"
+    elif campaign_slug == "gym-recovery":
+        can_y = "610+10*sin(t*1.7)"
+    elif campaign_slug == "fruit-vortex":
+        can_x = "W-w-55+28*sin(t*1.7)"
+        can_y = "505+22*cos(t*1.5)"
+
+    subtitle_filter = ""
+    if not music_only:
+        subtitle_filter = (
+            f"subtitles='{ffmpeg_path(subtitle_path)}':"
+            "force_style='FontName=DejaVu Sans,FontSize=8,PrimaryColour=&H00FFFFFF,"
+            "OutlineColour=&H00000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=36,Alignment=2',"
+        )
+
     filter_graph = (
-        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-        "crop=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=12[base];"
-        f"[{logo_input}:v]scale=120:-1[logo];"
-        f"[{product_input}:v]scale=430:430:force_original_aspect_ratio=decrease,"
-        "pad=430:430:(ow-iw)/2:(oh-ih)/2:color=white[product];"
-        "[base]drawbox=x=0:y=0:w=iw:h=285:color=black@0.42:t=fill,"
-        f"drawtext=fontfile='{ffmpeg_path(font)}':text='{BRAND_NAME}':"
-        "fontcolor=white:fontsize=62:x=(w-text_w)/2:y=145,"
+        "[0:v]scale=1188:2112:force_original_aspect_ratio=increase,"
+        "crop=1080:1920:x='54+18*sin(t*0.7)':y='96+22*cos(t*0.5)',"
+        "setsar=1,eq=saturation=1.2:contrast=1.08:brightness=0.01,"
+        "drawbox=x=0:y=0:w=iw:h=410:color=black@0.36:t=fill,"
+        "drawbox=x=0:y=1550:w=iw:h=370:color=black@0.42:t=fill,"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(hook_text)}':"
+        "fontcolor=#FFE27A:fontsize=45:x=58:y=112:"
+        "box=1:boxcolor=black@0.36:boxborderw=18,"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(item_text)}':"
-        "fontcolor=#FFE27A:fontsize=34:line_spacing=4:x=(w-text_w)/2:y=205[branded];"
-        "[branded][logo]overlay=55:45[withlogo];"
-        "[withlogo][product]overlay=W-w-55:670:enable='between(t,2.5,12.5)'[withproduct];"
-        f"[withproduct]drawtext=fontfile='{ffmpeg_path(font)}':"
-        f"textfile='{ffmpeg_path(benefits_text)}':fontcolor=white:fontsize=43:"
-        "line_spacing=16:x=65:y=1180:box=1:boxcolor=black@0.48:boxborderw=24:"
-        "enable='between(t,3,15)',"
-        f"subtitles='{ffmpeg_path(subtitle_path)}':"
-        "force_style='FontName=DejaVu Sans,FontSize=8,PrimaryColour=&H00FFFFFF,"
-        "OutlineColour=&H00000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=36,Alignment=2',"
+        "fontcolor=white:fontsize=42:line_spacing=8:x=58:y=190,"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(price_text)}':"
+        "fontcolor=#DFF8E6:fontsize=30:x=58:y=350[base];"
+        f"[{logo_input}:v]scale=118:-1[logo];"
+        f"[{can_input}:v]scale=500:-1,format=rgba[can];"
+        "[base][logo]overlay=W-w-50:54[withlogo];"
+        f"[withlogo][can]overlay=x='{can_x}':y='{can_y}':enable='lt(t,{end_start:.2f})'[withcan];"
+        f"[withcan]drawtext=fontfile='{ffmpeg_path(font)}':"
+        f"textfile='{ffmpeg_path(benefits_text)}':fontcolor=white:fontsize=39:"
+        "line_spacing=17:x=58:y=1235:box=1:boxcolor=black@0.46:boxborderw=22:"
+        "enable='between(t,4,15)',"
+        f"{subtitle_filter}"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(cta_text)}':"
-        f"fontcolor=white:fontsize=48:x=(w-text_w)/2:y=1375:"
-        f"box=1:boxcolor=#D84315@0.92:boxborderw=24:enable='gte(t,{end_start - 3:.2f})',"
-        f"drawbox=x=0:y=0:w=iw:h=ih:color=#173B2A:t=fill:enable='gte(t,{end_start:.2f})',"
+        f"fontcolor=white:fontsize=54:x=(w-text_w)/2:y=1465:"
+        f"box=1:boxcolor=#D84315@0.94:boxborderw=25:enable='between(t,13,{end_start:.2f})',"
+        f"drawbox=x=0:y=0:w=iw:h=ih:color=#102E25:t=fill:enable='gte(t,{end_start:.2f})',"
         f"drawtext=fontfile='{ffmpeg_path(font)}':text='{BRAND_NAME}':"
-        f"fontcolor=#FFE27A:fontsize=88:x=(w-text_w)/2:y=570:enable='gte(t,{end_start:.2f})',"
+        f"fontcolor=#FFE27A:fontsize=96:x=(w-text_w)/2:y=520:enable='gte(t,{end_start:.2f})',"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(item_text)}':"
+        f"fontcolor=white:fontsize=38:line_spacing=10:x=(w-text_w)/2:y=675:enable='gte(t,{end_start:.2f})',"
         f"drawtext=fontfile='{ffmpeg_path(font)}':text='Order on {DIRECT_ORDER_CONTACT}':"
-        f"fontcolor=white:fontsize=45:x=(w-text_w)/2:y=770:enable='gte(t,{end_start:.2f})',"
+        f"fontcolor=white:fontsize=46:x=(w-text_w)/2:y=895:enable='gte(t,{end_start:.2f})',"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(links_text)}':"
-        f"fontcolor=white:fontsize=29:line_spacing=18:x=(w-text_w)/2:y=900:"
+        f"fontcolor=#DFF8E6:fontsize=31:line_spacing=18:x=(w-text_w)/2:y=1035:"
         f"enable='gte(t,{end_start:.2f})'[v]"
     )
     if music:
@@ -359,10 +398,12 @@ def render(
         if music_only:
             filter_graph += ";[music]apad[a]"
         else:
-            filter_graph += ";[1:a]volume=1.0[narration];[narration][music]amix=inputs=2:duration=first:dropout_transition=0,apad[a]"
+            filter_graph += f";[{narration_input}:a]volume=1.0[narration];[narration][music]amix=inputs=2:duration=first:dropout_transition=0,apad[a]"
         audio_options = ["-map", "[a]"]
     else:
-        audio_options = ["-map", "1:a:0", "-af", "apad"]
+        if narration_input is None:
+            raise RuntimeError("Background music is required for music-only Fresh HVN posts.")
+        audio_options = ["-map", f"{narration_input}:a:0", "-af", "apad"]
     command += [
         "-filter_complex",
         filter_graph,
