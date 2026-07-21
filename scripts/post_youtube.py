@@ -13,8 +13,21 @@ from googleapiclient.http import MediaFileUpload
 
 from grand_forno_common import read_json, require_env
 
+TARGET_YOUTUBE_HANDLE = "@fresh_hvn"
+
+
+def assert_fresh_hvn_target() -> None:
+    expected = os.getenv("YOUTUBE_TARGET_HANDLE", TARGET_YOUTUBE_HANDLE).strip()
+    if not expected.startswith("@"):
+        expected = f"@{expected}"
+    if expected.lower() != TARGET_YOUTUBE_HANDLE:
+        raise RuntimeError(
+            f"YOUTUBE_TARGET_HANDLE must be {TARGET_YOUTUBE_HANDLE}, got {expected}"
+        )
+
 
 def upload(video_path: Path, content_path: Path) -> dict[str, Any]:
+    assert_fresh_hvn_target()
     require_env("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     content = read_json(content_path)
     credentials = Credentials(

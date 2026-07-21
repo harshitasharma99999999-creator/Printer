@@ -1,0 +1,127 @@
+name: Fresh HVN Daily Beverage Posts
+
+on:
+  schedule:
+    # 10:30 AM IST = 05:00 UTC.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Render only, do not publish
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fresh-hvn-daily-post
+  cancel-in-progress: false
+
+jobs:
+  create-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-5.4-mini
+      CONTENT_BRAND_NAME: Fresh HVN
+      DIRECT_ORDER_PHONE: "7045027768"
+      AVATAR_MODE: visual
+      BACKGROUND_MUSIC_PATH: assets/music/fresh-upbeat-loop.wav
+      BACKGROUND_MUSIC_VOLUME: "0.85"
+      MUSIC_ONLY_DURATION_SECONDS: "18"
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      YOUTUBE_TARGET_HANDLE: "@fresh_hvn"
+      YOUTUBE_PRIVACY_STATUS: public
+      INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+      INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+      INSTAGRAM_TARGET_HANDLE: fresh_hvn
+      INSTAGRAM_GRAPH_VERSION: v23.0
+      INSTAGRAM_PROVIDER: ${{ vars.INSTAGRAM_PROVIDER || 'upload_post' }}
+      UPLOAD_POST_API_KEY: ${{ secrets.UPLOAD_POST_API_KEY }}
+      UPLOAD_POST_USER: fresh_hvn
+      UPLOAD_POST_ASYNC: "true"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-grand-forno.txt
+
+      - name: Install FFmpeg and fonts
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements-grand-forno.txt
+
+      - name: Validate live publishing credentials
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          missing=0
+          for name in YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET YOUTUBE_REFRESH_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required for YouTube cloud publishing"
+              missing=1
+            fi
+          done
+          if [ "${INSTAGRAM_PROVIDER}" = "meta_graph" ]; then
+            for name in INSTAGRAM_ACCESS_TOKEN INSTAGRAM_ACCOUNT_ID; do
+              if [ -z "${!name}" ]; then
+                echo "::error::$name is required for Instagram Graph publishing"
+                missing=1
+              fi
+            done
+          elif [ "${INSTAGRAM_PROVIDER}" = "upload_post" ]; then
+            if [ -z "${UPLOAD_POST_API_KEY}" ]; then
+              echo "::error::UPLOAD_POST_API_KEY is required for Upload-Post publishing"
+              missing=1
+            fi
+          else
+            echo "::error::INSTAGRAM_PROVIDER must be meta_graph or upload_post for GitHub cloud posting"
+            missing=1
+          fi
+          exit "$missing"
+
+      - name: Generate and publish Fresh HVN beverage post
+        shell: bash
+        run: |
+          args=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            args="--dry-run"
+          fi
+          python scripts/fresh_hvn_cloud_daily.py $args
+
+      - name: Commit Fresh HVN history and logs
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          git config user.name "fresh-hvn-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/fresh_hvn_daily_history.json logs/
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Fresh HVN daily post history"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Save rendered media and logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-hvn-${{ github.run_id }}
+          path: |
+            output/
+            logs/
+          if-no-files-found: warn
+          retention-days: 30

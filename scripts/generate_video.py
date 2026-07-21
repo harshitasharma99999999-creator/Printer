@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -13,7 +14,7 @@ from typing import Any
 
 import requests
 
-from grand_forno_common import ROOT, read_json
+from grand_forno_common import BRAND_NAME, DIRECT_ORDER_CONTACT, ROOT, read_json
 
 FFMPEG = os.getenv("FFMPEG_BINARY") or shutil.which("ffmpeg")
 FFPROBE = os.getenv("FFPROBE_BINARY") or shutil.which("ffprobe")
@@ -186,17 +187,36 @@ def find_background_music() -> Path | None:
     if configured:
         candidates.append((ROOT / configured).resolve() if not Path(configured).is_absolute() else Path(configured))
     music_dir = ROOT / "assets" / "music"
+    approved_files = approved_music_files(music_dir)
     for suffix in ("*.mp3", "*.m4a", "*.wav", "*.aac", "*.ogg"):
         candidates.extend(sorted(music_dir.glob(suffix)))
     for candidate in candidates:
-        if candidate.exists() and candidate.is_file() and candidate.stat().st_size > 0:
+        resolved = candidate.resolve()
+        if approved_files and resolved.name not in approved_files:
+            continue
+        if resolved.exists() and resolved.is_file() and resolved.stat().st_size > 0:
             return candidate
     return None
 
 
+def approved_music_files(music_dir: Path) -> set[str]:
+    manifest = music_dir / "trending_songs.json"
+    if not manifest.exists():
+        return set()
+    with manifest.open(encoding="utf-8") as handle:
+        data = json.load(handle)
+    return {
+        str(track.get("file", "")).strip()
+        for track in data.get("tracks", [])
+        if str(track.get("status", "")).strip().lower() == "approved"
+        and str(track.get("language", "")).strip().lower() == "english"
+        and str(track.get("file", "")).strip()
+    }
+
+
 def render(
     content_path: Path,
-    audio_path: Path,
+    audio_path: Path | None,
     output: Path,
     allow_fallback: bool,
 ) -> dict[str, Any]:
@@ -208,7 +228,10 @@ def render(
     presenter = work_dir / "presenter.mp4"
     avatar_status = "generated"
     avatar_mode = os.getenv("AVATAR_MODE", "auto").strip().lower()
-    if avatar_mode == "visual":
+    music_only = audio_path is None
+    if music_only:
+        avatar_status = "music-only (voiceover disabled)"
+    elif avatar_mode == "visual":
         avatar_status = "fallback (visual mode configured)"
     elif os.getenv("AVATAR_API_KEY") and os.getenv("AVATAR_ID"):
         try:
@@ -222,7 +245,11 @@ def render(
     else:
         raise RuntimeError("AVATAR_API_KEY and AVATAR_ID are required")
 
-    duration = min(35.0, max(20.0, media_duration(audio_path) + 4.5))
+    duration = (
+        float(os.getenv("MUSIC_ONLY_DURATION_SECONDS", "28"))
+        if music_only
+        else min(35.0, max(20.0, media_duration(audio_path) + 4.5))
+    )
     subtitle_path = work_dir / "subtitles.srt"
     write_subtitles(content["script"], duration, subtitle_path)
 
@@ -237,10 +264,10 @@ def render(
         "\n".join(f"• {value}" for value in content["benefit_overlays"]),
         encoding="utf-8",
     )
-    cta_text.write_text("Order now on Zomato & Swiggy", encoding="utf-8")
+    cta_text.write_text("Order direct on WhatsApp or call", encoding="utf-8")
     links_text.write_text(
-        "Zomato: zomato.onelink.me/xqzv/w36rgxfb\n"
-        "Swiggy: swiggy.com/menu/1308871",
+        f"Same menu price as Zomato\n"
+        f"Contact: {DIRECT_ORDER_CONTACT}",
         encoding="utf-8",
     )
 
@@ -249,6 +276,11 @@ def render(
         raise RuntimeError("assets/logo.png is required")
     product = find_product_image(content["item"]["id"], allow_fallback=allow_fallback)
     music = find_background_music()
+    if music_only and not music:
+        raise RuntimeError(
+            "An approved English trending-style song is required because voiceover is disabled. "
+            "Add the licensed file to assets/music and list it in assets/music/trending_songs.json."
+        )
     font = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
     if not font.exists():
         font = ROOT / "fonts" / "bold_font.ttf"
@@ -258,19 +290,24 @@ def render(
         command += ["-i", str(presenter)]
     else:
         command += ["-loop", "1", "-i", str(product)]
-    command += ["-i", str(audio_path), "-i", str(logo), "-loop", "1", "-i", str(product)]
+    if not music_only:
+        command += ["-i", str(audio_path)]
+    command += ["-i", str(logo), "-loop", "1", "-i", str(product)]
     if music:
         command += ["-stream_loop", "-1", "-i", str(music)]
 
+    logo_input = 1 if music_only else 2
+    product_input = 2 if music_only else 3
+    music_input = 3 if music_only else 4
     end_start = max(0.0, duration - 5.0)
     filter_graph = (
         "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
         "crop=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=12[base];"
-        "[2:v]scale=190:-1[logo];"
-        "[3:v]scale=430:430:force_original_aspect_ratio=decrease,"
+        f"[{logo_input}:v]scale=190:-1[logo];"
+        f"[{product_input}:v]scale=430:430:force_original_aspect_ratio=decrease,"
         "pad=430:430:(ow-iw)/2:(oh-ih)/2:color=white[product];"
         "[base]drawbox=x=0:y=0:w=iw:h=285:color=black@0.42:t=fill,"
-        f"drawtext=fontfile='{ffmpeg_path(font)}':text='Grand Forno':"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':text='{BRAND_NAME}':"
         "fontcolor=white:fontsize=62:x=(w-text_w)/2:y=145,"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(item_text)}':"
         "fontcolor=#FFE27A:fontsize=54:x=(w-text_w)/2:y=218[branded];"
@@ -287,9 +324,9 @@ def render(
         f"fontcolor=white:fontsize=48:x=(w-text_w)/2:y=1375:"
         f"box=1:boxcolor=#D84315@0.92:boxborderw=24:enable='gte(t,{end_start - 3:.2f})',"
         f"drawbox=x=0:y=0:w=iw:h=ih:color=#173B2A:t=fill:enable='gte(t,{end_start:.2f})',"
-        f"drawtext=fontfile='{ffmpeg_path(font)}':text='Grand Forno':"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':text='{BRAND_NAME}':"
         f"fontcolor=#FFE27A:fontsize=88:x=(w-text_w)/2:y=570:enable='gte(t,{end_start:.2f})',"
-        f"drawtext=fontfile='{ffmpeg_path(font)}':text='Order now on Zomato & Swiggy':"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':text='Order direct on WhatsApp or call':"
         f"fontcolor=white:fontsize=45:x=(w-text_w)/2:y=770:enable='gte(t,{end_start:.2f})',"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(links_text)}':"
         f"fontcolor=white:fontsize=29:line_spacing=18:x=(w-text_w)/2:y=900:"
@@ -298,12 +335,15 @@ def render(
     if music:
         music_fade_out = max(0.0, duration - 1.5)
         filter_graph += (
-            f";[1:a]volume=1.0[narration];"
-            f"[4:a]atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,"
-            f"volume=0.12,afade=t=in:st=0:d=1.0,"
-            f"afade=t=out:st={music_fade_out:.3f}:d=1.5[music];"
-            f"[narration][music]amix=inputs=2:duration=first:dropout_transition=0,apad[a]"
+            f";[{music_input}:a]atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,"
+            f"volume={os.getenv('BACKGROUND_MUSIC_VOLUME', '0.85' if music_only else '0.12')},"
+            f"afade=t=in:st=0:d=1.0,"
+            f"afade=t=out:st={music_fade_out:.3f}:d=1.5[music]"
         )
+        if music_only:
+            filter_graph += ";[music]apad[a]"
+        else:
+            filter_graph += ";[1:a]volume=1.0[narration];[narration][music]amix=inputs=2:duration=first:dropout_transition=0,apad[a]"
         audio_options = ["-map", "[a]"]
     else:
         audio_options = ["-map", "1:a:0", "-af", "apad"]
@@ -339,6 +379,7 @@ def render(
         "avatar_status": avatar_status,
         "product_visual": str(product.relative_to(ROOT)),
         "background_music": str(music.relative_to(ROOT)) if music else None,
+        "voiceover": "disabled" if music_only else "enabled",
     }
 
 
@@ -349,9 +390,8 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--allow-fallback", action="store_true")
     args = parser.parse_args()
-    metadata = render(
-        Path(args.content), Path(args.audio), Path(args.output), args.allow_fallback
-    )
+    audio = None if args.audio.strip().lower() in {"none", "music-only", "disabled"} else Path(args.audio)
+    metadata = render(Path(args.content), audio, Path(args.output), args.allow_fallback)
     print(metadata)
 
 

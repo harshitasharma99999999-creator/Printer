@@ -1,4 +1,4 @@
-"""Generate safe Grand Forno script, title, caption, hashtags, and overlays."""
+"""Generate safe Fresh HVN script, title, caption, hashtags, and overlays."""
 
 from __future__ import annotations
 
@@ -11,9 +11,10 @@ from typing import Any
 import requests
 
 from grand_forno_common import (
+    BRAND_NAME,
+    DIRECT_ORDER_CONTACT,
     HASHTAGS,
-    SWIGGY_URL,
-    ZOMATO_URL,
+    WHATSAPP_CTA,
     read_json,
     validate_marketing_copy,
     write_json,
@@ -21,29 +22,29 @@ from grand_forno_common import (
 
 CREATIVE_ANGLES = [
     {
-        "name": "busy-day light meal",
-        "hook": "If you want something fresh without making it feel like a heavy meal",
-        "caption_lead": "Fresh fruit, clean flavours, and a bowl that feels good for busy days.",
+        "name": "busy-day fresh drink",
+        "hook": "Your busy day can still have something chilled, colourful, and fresh",
+        "caption_lead": "A fresh drink for busy days when you want something colourful, refreshing, and easy to order directly.",
     },
     {
-        "name": "post-workout fresh bowl",
-        "hook": "After a workout or a long workday, this is the kind of bowl that still feels light",
-        "caption_lead": "A fresh, satisfying bowl for days when you want flavour without going heavy.",
+        "name": "post-workout cooler",
+        "hook": "Post-workout or post-office, a chilled drink keeps things fresh without feeling heavy",
+        "caption_lead": "A satisfying post-workout or office beverage with fruit, freshness, and clean flavour.",
     },
     {
-        "name": "office snack upgrade",
-        "hook": "If your usual snack feels boring, this fruit bowl is an easy upgrade",
-        "caption_lead": "Upgrade your snack break with fresh fruit, clean flavours, and a colourful bowl.",
+        "name": "office beverage upgrade",
+        "hook": "If the office beverage plan is boring again, send this Fresh HVN drink to the group chat",
+        "caption_lead": "Office beverage upgrade: fresh fruits, clean flavour, and drinks people can actually agree on.",
     },
     {
         "name": "cool refreshing craving",
-        "hook": "When you want something chilled, colourful, and refreshing",
-        "caption_lead": "For a refreshing craving, keep it simple: fresh fruit, balanced flavours, easy ordering.",
+        "hook": "When Mumbai feels too warm, a chilled fruit bowl just makes sense",
+        "caption_lead": "For a refreshing craving, keep it simple: chilled fruit, balanced flavour, direct ordering.",
     },
     {
         "name": "simple healthy choice",
-        "hook": "Some days, a simple fresh bowl is exactly what you need",
-        "caption_lead": "A simple healthy choice with fresh fruit, good texture, and Grand Forno flavour.",
+        "hook": "Some days, the better choice is just a fresh bowl that tastes good",
+        "caption_lead": "A simple fresh choice with real fruit, good texture, and Fresh HVN flavour.",
     },
 ]
 
@@ -66,26 +67,53 @@ def choose_creative_angle(item: dict[str, Any], history: dict[str, Any] | None) 
     return CREATIVE_ANGLES[item_post_count(item["id"], history) % len(CREATIVE_ANGLES)]
 
 
+def clean_text(value: Any) -> Any:
+    if isinstance(value, str):
+        value = value.replace(chr(8212), "-")
+        value = value.replace(chr(8211), "-")
+        value = value.replace(chr(226) + chr(8364) + chr(8221), "-")
+        value = value.replace(chr(226) + chr(8364) + chr(8220), "-")
+        replacements = {
+            "â€”": "-",
+            "â€“": "-",
+            "â€˜": "'",
+            "â€™": "'",
+            "â€œ": '"',
+            "â€": '"',
+            "â‚¹": "Rs ",
+        }
+        for old, new in replacements.items():
+            value = value.replace(old, new)
+        return value
+    if isinstance(value, list):
+        return [clean_text(item) for item in value]
+    if isinstance(value, dict):
+        return {key: clean_text(item) for key, item in value.items()}
+    return value
+
+
 def fallback_content(item: dict[str, Any], history: dict[str, Any] | None = None) -> dict[str, Any]:
     ingredients = ", ".join(item["ingredients"][:4])
     benefits = ", ".join(item["benefits"])
     angle = choose_creative_angle(item, history)
     script = (
         f"{angle['hook']}, "
-        f"Grand Forno's {item['name']} is a lovely pick. "
-        f"You get {ingredients}, packed neatly into a colourful {item['serving_size']} bowl. "
-        f"It is {benefits}, with {item['protein']} protein and around {item['calories']} calories. "
-        f"Simple, refreshing, and easy to order on Zomato or Swiggy."
+        f"{BRAND_NAME}'s {item['name']} brings {ingredients} into one fresh {item['serving_size']} serving. "
+        f"It is {benefits}, with {item['protein']} protein, around {item['calories']} calories, and the same menu price as Zomato - {item['price']}. "
+        f"Order directly by WhatsApp or call {DIRECT_ORDER_CONTACT}."
     )
     caption = (
         f"{angle['caption_lead']} "
-        f"Try Grand Forno's {item['name']} — {benefits}, made with fresh fruits.\n\n"
-        f"Order Grand Forno on Zomato:\n{ZOMATO_URL}\n\n"
-        f"Order on Swiggy:\n{SWIGGY_URL}\n\n{HASHTAGS}"
+        f"Try {BRAND_NAME}'s {item['name']} - {benefits}, made with fresh fruits.\n\n"
+        f"{item['serving_size']}, {item['protein']} protein, around {item['calories']} calories.\n"
+        f"Same menu price as Zomato - {item['price']}.\n"
+        f"Best for office orders, post-workout cravings, chilled beverage breaks, and repeat drink orders.\n\n"
+        f"Order directly for quick confirmation and easy custom coordination.\n"
+        f"{WHATSAPP_CTA}\n\n{HASHTAGS}"
     )
     return {
         "script": script,
-        "title": f"{item['name']} at Grand Forno #Shorts",
+        "title": f"{BRAND_NAME} {item['name']} #Shorts",
         "caption": caption,
         "hashtags": HASHTAGS.split(),
         "benefit_overlays": item["benefits"][:3],
@@ -114,20 +142,27 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
         },
     }
     instructions = (
-        "You write short-form food ads for Grand Forno, a Mumbai cloud kitchen. "
+        f"You write short-form beverage ads for {BRAND_NAME}, a Mumbai fresh juice and smoothie brand. "
         "Use a friendly, natural Indian food-delivery tone that feels like a real food creator "
-        "or small restaurant owner speaking, not a generic AI advertisement. Write narration "
-        "for 20-30 seconds, roughly 60-82 words. Be concise, warm, and sales-focused. "
-        "Make it appealing to health-conscious customers: fresh fruit, light meal, clean flavours, "
-        "protein or fiber where supplied, busy-day convenience, and satisfying texture. "
+        "or small restaurant owner speaking, not a generic AI advertisement. Write on-screen copy "
+        "for a music-only Reel/Short, roughly 45-65 words. Be concise, warm, and sales-focused. "
+        "Make it appealing to health-conscious customers: fresh juices, smoothies, clean flavours, "
+        "aluminium juice cans where supplied, protein or fiber where supplied, busy-day convenience, office orders, WhatsApp orders, "
+        "direct phone orders, Instagram DMs, and satisfying texture. "
         "Use one concrete sensory detail from the ingredients, such as creamy yogurt, juicy fruit, "
         "crunchy seeds, bright berries, or chilled fresh fruit. Use only supplied facts. "
         "Avoid robotic phrases, over-polished hype, fake urgency, excessive emojis, and repeated lines. "
         "Never promise cures, guaranteed weight loss, disease prevention, or medical benefits. "
         "Safe phrases include protein-rich, refreshing, fiber-rich, supports digestion, "
         "healthy choice, energy boosting, and made with fresh fruits. "
-        "The caption MUST contain the two exact order labels, URLs, and every exact hashtag "
-        "provided in the input. The YouTube title must be at most 100 characters and include #Shorts."
+        "Mention the price exactly as supplied and call it the same menu price as Zomato. "
+        "Mention the serving size and one order use case such as office beverages, party drinks, smoothies, or repeat juice orders. "
+        "The caption MUST NOT mention Zomato ordering, Swiggy ordering, Zomato links, or Swiggy links. "
+        "Do not mention platform fees, commissions, aggregator charges, or cutting out delivery apps. "
+        "Frame direct ordering as quick confirmation, easy custom coordination, and personal service. "
+        "It may say the direct price is the same as Zomato. "
+        "The caption MUST contain every exact hashtag provided in the input and the exact WhatsApp/call CTA. "
+        "The YouTube title must be at most 100 characters and include #Shorts."
     )
     recent_posts = []
     if history:
@@ -141,9 +176,9 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
         ]
     angle = choose_creative_angle(item, history)
     prompt = {
-        "restaurant": "Grand Forno",
-        "youtube": "@fornogrand",
-        "instagram": "grand_forno",
+        "restaurant": BRAND_NAME,
+        "youtube": "@fresh_hvn",
+        "instagram": "fresh_hvn",
         "menu_item": item,
         "creative_angle": angle,
         "recent_posts_to_avoid_repeating": recent_posts,
@@ -151,10 +186,16 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
             "Do not repeat the same hook, title, caption opening, or wording pattern "
             "from recent posts. Keep the item facts the same, but make this post feel newly written."
         ),
-        "required_caption_block": (
-            f"Order Grand Forno on Zomato:\n{ZOMATO_URL}\n\n"
-            f"Order on Swiggy:\n{SWIGGY_URL}\n\n{HASHTAGS}"
-        ),
+        "required_caption_block": f"{WHATSAPP_CTA}\n\n{HASHTAGS}",
+        "forbidden_caption_words": ["Order on Zomato", "Order on Swiggy", "Zomato:", "Swiggy:"],
+        "must_include_sales_details": [
+            "exact price from menu_item.price",
+            "same menu price as Zomato",
+            "serving_size",
+            "protein when available",
+            "WhatsApp or call direct ordering",
+            "office, party, repeat, or group order use case",
+        ],
     }
     response = requests.post(
         "https://api.openai.com/v1/responses",
@@ -210,6 +251,7 @@ def generate(
     else:
         raise RuntimeError("OPENAI_API_KEY is required when fallback mode is disabled")
     content["item"] = item
+    content = clean_text(content)
     validate_marketing_copy(content)
     return content
 
