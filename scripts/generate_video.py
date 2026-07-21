@@ -160,6 +160,22 @@ def write_subtitles(script: str, duration: float, output: Path) -> None:
     output.write_text("\n".join(blocks), encoding="utf-8")
 
 
+def wrap_label(value: str, max_chars: int = 22) -> str:
+    words = value.split()
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        candidate = " ".join([*current, word]).strip()
+        if current and len(candidate) > max_chars:
+            lines.append(" ".join(current))
+            current = [word]
+        else:
+            current.append(word)
+    if current:
+        lines.append(" ".join(current))
+    return "\n".join(lines[:2])
+
+
 def ffmpeg_path(path: Path) -> str:
     return str(path.resolve()).replace("\\", "/").replace(":", r"\:")
 
@@ -175,7 +191,7 @@ def find_product_image(item_id: str, allow_fallback: bool = False) -> Path:
             f"Missing item-specific product visual for {item_id}. "
             f"Add assets/product_images/{item_id}.png or .jpg before publishing."
         )
-    default = image_dir / "default-fruit-bowl.png"
+    default = image_dir / "fresh-hvn-default-can.png"
     if default.exists():
         return default
     return ROOT / "assets" / "logo.png"
@@ -259,12 +275,12 @@ def render(
     benefits_text = text_dir / "benefits.txt"
     cta_text = text_dir / "cta.txt"
     links_text = text_dir / "links.txt"
-    item_text.write_text(content["item"]["name"], encoding="utf-8")
+    item_text.write_text(wrap_label(content["item"]["name"]), encoding="utf-8")
     benefits_text.write_text(
         "\n".join(f"• {value}" for value in content["benefit_overlays"]),
         encoding="utf-8",
     )
-    cta_text.write_text("Order direct on WhatsApp or call", encoding="utf-8")
+    cta_text.write_text(f"Order on {DIRECT_ORDER_CONTACT}", encoding="utf-8")
     links_text.write_text(
         f"Same menu price as Zomato\n"
         f"Contact: {DIRECT_ORDER_CONTACT}",
@@ -303,14 +319,14 @@ def render(
     filter_graph = (
         "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
         "crop=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=12[base];"
-        f"[{logo_input}:v]scale=190:-1[logo];"
+        f"[{logo_input}:v]scale=120:-1[logo];"
         f"[{product_input}:v]scale=430:430:force_original_aspect_ratio=decrease,"
         "pad=430:430:(ow-iw)/2:(oh-ih)/2:color=white[product];"
         "[base]drawbox=x=0:y=0:w=iw:h=285:color=black@0.42:t=fill,"
         f"drawtext=fontfile='{ffmpeg_path(font)}':text='{BRAND_NAME}':"
         "fontcolor=white:fontsize=62:x=(w-text_w)/2:y=145,"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(item_text)}':"
-        "fontcolor=#FFE27A:fontsize=54:x=(w-text_w)/2:y=218[branded];"
+        "fontcolor=#FFE27A:fontsize=34:line_spacing=4:x=(w-text_w)/2:y=205[branded];"
         "[branded][logo]overlay=55:45[withlogo];"
         "[withlogo][product]overlay=W-w-55:670:enable='between(t,2.5,12.5)'[withproduct];"
         f"[withproduct]drawtext=fontfile='{ffmpeg_path(font)}':"
@@ -326,7 +342,7 @@ def render(
         f"drawbox=x=0:y=0:w=iw:h=ih:color=#173B2A:t=fill:enable='gte(t,{end_start:.2f})',"
         f"drawtext=fontfile='{ffmpeg_path(font)}':text='{BRAND_NAME}':"
         f"fontcolor=#FFE27A:fontsize=88:x=(w-text_w)/2:y=570:enable='gte(t,{end_start:.2f})',"
-        f"drawtext=fontfile='{ffmpeg_path(font)}':text='Order direct on WhatsApp or call':"
+        f"drawtext=fontfile='{ffmpeg_path(font)}':text='Order on {DIRECT_ORDER_CONTACT}':"
         f"fontcolor=white:fontsize=45:x=(w-text_w)/2:y=770:enable='gte(t,{end_start:.2f})',"
         f"drawtext=fontfile='{ffmpeg_path(font)}':textfile='{ffmpeg_path(links_text)}':"
         f"fontcolor=white:fontsize=29:line_spacing=18:x=(w-text_w)/2:y=900:"
