@@ -14,6 +14,24 @@
         "url": null
       },
       "run_id": "20260721T071833Z"
+    },
+    {
+      "created_at": "2026-07-21T07:20:39+00:00",
+      "item_id": "fresh-hvn-fresh-watermelon-juice",
+      "item_name": "Fresh Watermelon Juice",
+      "title": "Fresh Watermelon Juice | #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "Ua-JONQj2UQ",
+        "url": "https://www.youtube.com/shorts/Ua-JONQj2UQ"
+      },
+      "instagram": {
+        "status": "manual_required",
+        "reason": "Upload-Post Instagram auto-publish failed: RuntimeError: Upload-Post upload request failed with HTTP 429: {\"success\":false,\"message\":\"This upload (1 platforms) would exceed your monthly limit of 10 uploads. You have 0 upload(s) remaining this period.\",\"usage\":{\"count\":10,\"limit\":10,\"last_reset\":\"2026-07-06T15:52:13.506152\"}}\n",
+        "package": "/home/runner/work/Printer/Printer/output/20260721T072014Z-fresh-hvn-cloud/instagram-manual",
+        "url": null
+      },
+      "run_id": "20260721T072014Z"
     }
   ]
 }
