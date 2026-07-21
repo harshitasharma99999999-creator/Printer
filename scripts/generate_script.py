@@ -20,31 +20,42 @@ from grand_forno_common import (
     write_json,
 )
 
-CREATIVE_ANGLES = [
+CINEMATIC_AD_STYLES = [
     {
-        "name": "busy-day fresh drink",
-        "hook": "Your busy day can still have something chilled, colourful, and fresh",
-        "caption_lead": "A fresh drink for busy days when you want something colourful, refreshing, and easy to order directly.",
+        "name": "Fruit Explosion",
+        "hook": "A cold Fresh HVN can appears in darkness, then real fruit colour bursts around it",
+        "caption_lead": "Real fruit just got cooler. A cinematic Fresh HVN can moment built for chilled cravings and direct orders.",
+        "visual_direction": "dark studio, hero 250 ml aluminium can, fruit flying toward the can, liquid splash, condensation, sharp can-opening sound",
     },
     {
-        "name": "post-workout cooler",
-        "hook": "Post-workout or post-office, a chilled drink keeps things fresh without feeling heavy",
-        "caption_lead": "A satisfying post-workout or office beverage with fruit, freshness, and clean flavour.",
+        "name": "Ice Drop",
+        "hook": "The Fresh HVN can drops into crushed ice and the whole frame turns cold",
+        "caption_lead": "Freshness sealed cold. A premium chilled drink shot with ice, droplets, and Fresh HVN energy.",
+        "visual_direction": "slow-motion can drop, crushed ice explosion, cold droplets, rotating camera, premium reflections",
     },
     {
-        "name": "office beverage upgrade",
-        "hook": "If the office beverage plan is boring again, send this Fresh HVN drink to the group chat",
-        "caption_lead": "Office beverage upgrade: fresh fruits, clean flavour, and drinks people can actually agree on.",
+        "name": "Gym Recovery",
+        "hook": "After the final set, the Fresh HVN can opens with a crisp cold snap",
+        "caption_lead": "Your post-workout upgrade: a Fresh HVN drink for gym bags, busy days, and direct orders.",
+        "visual_direction": "gym setting, towel and shaker nearby, macro can tab, ingredients shown, no muscle-building claim",
     },
     {
-        "name": "cool refreshing craving",
-        "hook": "When Mumbai feels too warm, a chilled fruit bowl just makes sense",
-        "caption_lead": "For a refreshing craving, keep it simple: chilled fruit, balanced flavour, direct ordering.",
+        "name": "Office Refresh",
+        "hook": "At 4 PM, a cold Fresh HVN can turns the desk from dull to fresh",
+        "caption_lead": "Refresh your 4 PM with Fresh HVN: premium beverage energy for office breaks and group orders.",
+        "visual_direction": "modern desk, low-energy lighting shifts brighter after can opens, fruit and ice close-ups",
     },
     {
-        "name": "simple healthy choice",
-        "hook": "Some days, the better choice is just a fresh bowl that tastes good",
-        "caption_lead": "A simple fresh choice with real fruit, good texture, and Fresh HVN flavour.",
+        "name": "Mumbai Local Campaign",
+        "hook": "Mulund gets a colder, cleaner Fresh HVN can moment",
+        "caption_lead": "Mumbai, drink fresh. Fresh HVN brings chilled juice and smoothie ads with a premium local feel.",
+        "visual_direction": "Mumbai neighbourhood lifestyle, Mulund order focus, can appears naturally in gym, office or college routine",
+    },
+    {
+        "name": "Ingredient Journey",
+        "hook": "Fresh ingredients move from cut fruit to a chilled Fresh HVN can",
+        "caption_lead": "What you see is what goes in. A clean Fresh HVN ingredient story with premium can-first visuals.",
+        "visual_direction": "ingredient cuts, blending motion, liquid pour, can seal, chilled end card",
     },
 ]
 
@@ -64,7 +75,7 @@ def item_post_count(item_id: str, history: dict[str, Any] | None) -> int:
 
 
 def choose_creative_angle(item: dict[str, Any], history: dict[str, Any] | None) -> dict[str, str]:
-    return CREATIVE_ANGLES[item_post_count(item["id"], history) % len(CREATIVE_ANGLES)]
+    return CINEMATIC_AD_STYLES[item_post_count(item["id"], history) % len(CINEMATIC_AD_STYLES)]
 
 
 def clean_text(value: Any) -> Any:
@@ -98,16 +109,17 @@ def fallback_content(item: dict[str, Any], history: dict[str, Any] | None = None
     angle = choose_creative_angle(item, history)
     script = (
         f"{angle['hook']}, "
-        f"{BRAND_NAME}'s {item['name']} brings {ingredients} into one fresh {item['serving_size']} serving. "
-        f"It is {benefits}, with {item['protein']} protein, around {item['calories']} calories, and the same menu price as Zomato - {item['price']}. "
+        f"{BRAND_NAME}'s {item['name']} is shown as a premium chilled 250 ml aluminium can with ice, condensation, and {ingredients}. "
+        f"Visual direction: {angle['visual_direction']}. "
+        f"Menu price stays exactly {item['price']}. "
         f"Order on {DIRECT_ORDER_CONTACT}."
     )
     caption = (
         f"{angle['caption_lead']} "
-        f"Try {BRAND_NAME}'s {item['name']} - {benefits}, made with fresh fruits.\n\n"
-        f"{item['serving_size']}, {item['protein']} protein, around {item['calories']} calories.\n"
+        f"Try {BRAND_NAME}'s {item['name']} - {benefits}, made for premium chilled beverage moments.\n\n"
+        f"{item['serving_size']} serving.\n"
         f"Same menu price as Zomato - {item['price']}.\n"
-        f"Best for office orders, post-workout cravings, chilled beverage breaks, and repeat drink orders.\n\n"
+        f"Best for office orders, gym bags, college breaks, chilled beverage cravings, and repeat drink orders.\n\n"
         f"Order directly for quick confirmation and easy custom coordination.\n"
         f"{WHATSAPP_CTA}\n\n{HASHTAGS}"
     )
@@ -118,6 +130,8 @@ def fallback_content(item: dict[str, Any], history: dict[str, Any] | None = None
         "hashtags": HASHTAGS.split(),
         "benefit_overlays": item["benefits"][:3],
         "creative_angle": angle["name"],
+        "cinematic_style": angle["name"],
+        "visual_direction": angle["visual_direction"],
     }
 
 
@@ -142,21 +156,17 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
         },
     }
     instructions = (
-        f"You write short-form beverage ads for {BRAND_NAME}, a Mumbai fresh juice and smoothie brand. "
-        "Use a friendly, natural Indian food-delivery tone that feels like a real food creator "
-        "or small restaurant owner speaking, not a generic AI advertisement. Write on-screen copy "
-        "for a music-only Reel/Short, roughly 45-65 words. Be concise, warm, and sales-focused. "
-        "Make it appealing to health-conscious customers: fresh juices, smoothies, clean flavours, "
-        "aluminium juice cans where supplied, protein or fiber where supplied, busy-day convenience, office orders, WhatsApp orders, "
-        "direct phone orders, Instagram DMs, and satisfying texture. "
-        "Use one concrete sensory detail from the ingredients, such as creamy yogurt, juicy fruit, "
-        "crunchy seeds, bright berries, or chilled fresh fruit. Use only supplied facts. "
+        f"You write premium cinematic short-form beverage ads for {BRAND_NAME}, a Mumbai fresh juice and smoothie brand. "
+        "The ad must feel like a premium canned beverage commercial, not a normal restaurant menu post. "
+        "Write on-screen copy for a music-only Reel/Short, roughly 45-65 words. Be concise, bold, modern, and sales-focused. "
+        "Usually make the hero object a Fresh HVN 250 ml aluminium can with cold condensation, ice, fresh fruit motion, liquid splash, dramatic lighting, macro can-opening sound, and a premium end card. "
+        "Use one concrete sensory detail from the ingredients and one cinematic direction from the selected campaign style. Use only supplied facts. "
         "Avoid robotic phrases, over-polished hype, fake urgency, excessive emojis, and repeated lines. "
         "Never promise cures, guaranteed weight loss, disease prevention, or medical benefits. "
         "Safe phrases include protein-rich, refreshing, fiber-rich, supports digestion, "
         "healthy choice, energy boosting, and made with fresh fruits. "
         "Mention the price exactly as supplied and call it the same menu price as Zomato. "
-        "Mention the serving size and one order use case such as office beverages, party drinks, smoothies, or repeat juice orders. "
+        "Mention the serving size and one order use case such as office beverages, gym bags, college breaks, party drinks, smoothies, or repeat juice orders. "
         "The caption MUST NOT mention Zomato ordering, Swiggy ordering, Zomato links, or Swiggy links. "
         "Do not mention platform fees, commissions, aggregator charges, or cutting out delivery apps. "
         "Frame direct ordering as quick confirmation, easy custom coordination, and personal service. "
@@ -181,7 +191,7 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
         "youtube": "@fresh_hvn",
         "instagram": "fresh_hvn",
         "menu_item": item,
-        "creative_angle": angle,
+        "cinematic_campaign_style": angle,
         "recent_posts_to_avoid_repeating": recent_posts,
         "freshness_rule": (
             "Do not repeat the same hook, title, caption opening, or wording pattern "
@@ -196,6 +206,13 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
             "protein when available",
             f"Order on {DIRECT_ORDER_CONTACT}",
             "office, party, repeat, or group order use case",
+            "premium 250 ml aluminium can visual direction",
+        ],
+        "brand_consistency_rules": [
+            "Preserve exact Fresh HVN spelling",
+            "Do not invent extra label text",
+            "Do not distort can shape",
+            "Keep the can as a premium hero object where possible",
         ],
     }
     response = requests.post(
@@ -230,6 +247,8 @@ def generate_with_openai(item: dict[str, Any], history: dict[str, Any] | None = 
         raise RuntimeError("OpenAI returned no output text")
     content = json.loads(output_text)
     content["creative_angle"] = angle["name"]
+    content["cinematic_style"] = angle["name"]
+    content["visual_direction"] = angle["visual_direction"]
     return content
 
 
