@@ -248,6 +248,24 @@
         "url": null
       },
       "run_id": "20260801T073027Z"
+    },
+    {
+      "created_at": "2026-08-02T07:34:27+00:00",
+      "item_id": "fresh-hvn-fresh-pomegranate-juice",
+      "item_name": "Fresh Pomegranate Juice",
+      "title": "Fresh Pomegranate Juice in a 250 ml Can | #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "YPQU64QG0Pw",
+        "url": "https://www.youtube.com/shorts/YPQU64QG0Pw"
+      },
+      "instagram": {
+        "status": "manual_required",
+        "reason": "Upload-Post Instagram auto-publish failed: RuntimeError: Upload-Post upload request failed with HTTP 429: {\"success\":false,\"message\":\"This upload (1 platforms) would exceed your monthly limit of 10 uploads. You have 0 upload(s) remaining this period.\",\"usage\":{\"count\":10,\"limit\":10,\"last_reset\":\"2026-07-06T15:52:13.506152\"}}\n",
+        "package": "/home/runner/work/Printer/Printer/output/20260802T073358Z-fresh-hvn-cloud/instagram-manual",
+        "url": null
+      },
+      "run_id": "20260802T073358Z"
     }
   ]
 }
