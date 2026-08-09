@@ -1,0 +1,7 @@
+{"timestamp": "2026-08-09T05:49:59+00:00", "event": "run_started", "run_id": "20260809T054959Z", "dry_run": false}
+{"timestamp": "2026-08-09T05:49:59+00:00", "event": "item_selected", "item_id": "fresh-hvn-fresh-guava-juice", "item_name": "Fresh Guava Juice"}
+{"timestamp": "2026-08-09T05:50:02+00:00", "event": "copy_generated", "title": "Fresh Guava Juice in a 250 ml Can | #Shorts"}
+{"timestamp": "2026-08-09T05:50:26+00:00", "event": "video_generated", "duration_seconds": 18.0, "avatar_status": "music-only (voiceover disabled)", "product_visual": "assets/product_images/fresh-hvn-default-can.png", "background_music": "assets/music/fresh-upbeat-loop.wav", "voiceover": "disabled"}
+{"timestamp": "2026-08-09T05:50:28+00:00", "event": "youtube_complete", "result": {"status": "uploaded", "video_id": "EIZ1I1tft5c", "url": "https://www.youtube.com/shorts/EIZ1I1tft5c"}}
+{"timestamp": "2026-08-09T05:52:02+00:00", "event": "instagram_complete", "result": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/DbzurbvggEU/", "raw_status": null, "request_id": "b012368a-9d7a-416f-af40-73b26433309b"}}
+{"timestamp": "2026-08-09T05:52:02+00:00", "event": "run_complete", "youtube": {"status": "uploaded", "video_id": "EIZ1I1tft5c", "url": "https://www.youtube.com/shorts/EIZ1I1tft5c"}, "instagram": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/DbzurbvggEU/", "raw_status": null, "request_id": "b012368a-9d7a-416f-af40-73b26433309b"}}
