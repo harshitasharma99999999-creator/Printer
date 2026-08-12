@@ -440,6 +440,26 @@
         "request_id": "ea94fe90-cb0c-46e1-ad11-bd04689a3486"
       },
       "run_id": "20260811T055601Z"
+    },
+    {
+      "created_at": "2026-08-12T06:19:41+00:00",
+      "item_id": "fresh-hvn-high-protein-peanut-butter-banana-oats-smoothie",
+      "item_name": "High Protein Peanut Butter Banana Oats Smoothie",
+      "title": "Fresh HVN High Protein Peanut Butter Banana Oats Smoothie | #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "p33t1qBFYnQ",
+        "url": "https://www.youtube.com/shorts/p33t1qBFYnQ"
+      },
+      "instagram": {
+        "status": "uploaded",
+        "provider": "upload_post",
+        "media_id": null,
+        "url": "https://www.instagram.com/reel/Db7gNjVj0Vp/",
+        "raw_status": null,
+        "request_id": "388e692a-07c2-43ae-b8bf-fcf160444825"
+      },
+      "run_id": "20260812T061824Z"
     }
   ]
 }
