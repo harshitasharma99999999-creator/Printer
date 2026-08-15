@@ -500,6 +500,26 @@
         "request_id": "f99c3c93-54dd-49a3-857f-6adc2bc85d70"
       },
       "run_id": "20260814T061808Z"
+    },
+    {
+      "created_at": "2026-08-15T05:30:35+00:00",
+      "item_id": "fresh-hvn-abc-detox-juice",
+      "item_name": "Fresh ABC Detox Juice",
+      "title": "Fresh HVN Fresh ABC Detox Juice | 250 ml Can | #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "nSnd-6AyeDk",
+        "url": "https://www.youtube.com/shorts/nSnd-6AyeDk"
+      },
+      "instagram": {
+        "status": "uploaded",
+        "provider": "upload_post",
+        "media_id": null,
+        "url": "https://www.instagram.com/reel/DcDI-fBEV47/",
+        "raw_status": null,
+        "request_id": "03333e49-6802-42f9-a33e-0aa71b884cc3"
+      },
+      "run_id": "20260815T052916Z"
     }
   ]
 }
