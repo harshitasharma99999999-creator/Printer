@@ -610,6 +610,24 @@
         "url": null
       },
       "run_id": "20260820T053541Z"
+    },
+    {
+      "created_at": "2026-08-21T05:38:02+00:00",
+      "item_id": "fresh-hvn-high-protein-peanut-butter-banana-oats-smoothie",
+      "item_name": "High Protein Peanut Butter Banana Oats Smoothie",
+      "title": "Fresh HVN High Protein Peanut Butter Banana Oats Smoothie | #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "Wj8wMkdmhi0",
+        "url": "https://www.youtube.com/shorts/Wj8wMkdmhi0"
+      },
+      "instagram": {
+        "status": "manual_required",
+        "reason": "Upload-Post Instagram auto-publish failed: RuntimeError: Upload-Post upload request failed with HTTP 429: {\"success\":false,\"message\":\"This upload (1 platforms) would exceed your monthly limit of 10 uploads. You have 0 upload(s) remaining this period.\",\"usage\":{\"count\":10,\"limit\":10,\"last_reset\":\"2026-08-06T07:43:54.033221\"}}\n",
+        "package": "/home/runner/work/Printer/Printer/output/20260821T053740Z-fresh-hvn-cloud/instagram-manual",
+        "url": null
+      },
+      "run_id": "20260821T053740Z"
     }
   ]
 }
