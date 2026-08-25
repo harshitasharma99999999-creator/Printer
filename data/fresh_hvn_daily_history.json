@@ -682,6 +682,24 @@
         "url": null
       },
       "run_id": "20260824T054200Z"
+    },
+    {
+      "created_at": "2026-08-25T05:36:30+00:00",
+      "item_id": "fresh-hvn-fresh-watermelon-juice",
+      "item_name": "Fresh Watermelon Juice",
+      "title": "Fresh Watermelon Juice in a 250 ml Can | #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "cy1XkJ0kr3Y",
+        "url": "https://www.youtube.com/shorts/cy1XkJ0kr3Y"
+      },
+      "instagram": {
+        "status": "manual_required",
+        "reason": "Upload-Post Instagram auto-publish failed: RuntimeError: Upload-Post upload request failed with HTTP 429: {\"success\":false,\"message\":\"This upload (1 platforms) would exceed your monthly limit of 10 uploads. You have 0 upload(s) remaining this period.\",\"usage\":{\"count\":10,\"limit\":10,\"last_reset\":\"2026-08-06T07:43:54.033221\"}}\n",
+        "package": "/home/runner/work/Printer/Printer/output/20260825T053558Z-fresh-hvn-cloud/instagram-manual",
+        "url": null
+      },
+      "run_id": "20260825T053558Z"
     }
   ]
 }
