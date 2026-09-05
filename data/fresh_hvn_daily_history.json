@@ -880,6 +880,26 @@
         "url": null
       },
       "run_id": "20260904T092458Z"
+    },
+    {
+      "created_at": "2026-09-05T08:54:42+00:00",
+      "item_id": "fresh-hvn-fresh-guava-juice",
+      "item_name": "Fresh Guava Juice",
+      "title": "Fresh HVN Fresh Guava Juice #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "Sm4Q9cZfVvY",
+        "url": "https://www.youtube.com/shorts/Sm4Q9cZfVvY"
+      },
+      "instagram": {
+        "status": "uploaded",
+        "provider": "upload_post",
+        "media_id": null,
+        "url": "https://www.instagram.com/reel/Dc5lBzWD1Zi/",
+        "raw_status": null,
+        "request_id": "85277cd2-957d-4ea1-9312-76a7577a8ee7"
+      },
+      "run_id": "20260905T085326Z"
     }
   ]
 }
