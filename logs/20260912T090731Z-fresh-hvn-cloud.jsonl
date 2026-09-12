@@ -1,0 +1,7 @@
+{"timestamp": "2026-09-12T09:07:31+00:00", "event": "run_started", "run_id": "20260912T090731Z", "dry_run": false}
+{"timestamp": "2026-09-12T09:07:31+00:00", "event": "item_selected", "item_id": "fresh-hvn-fresh-watermelon-juice", "item_name": "Fresh Watermelon Juice"}
+{"timestamp": "2026-09-12T09:07:32+00:00", "event": "copy_generated", "title": "Fresh HVN Fresh Watermelon Juice #Shorts"}
+{"timestamp": "2026-09-12T09:07:55+00:00", "event": "video_generated", "duration_seconds": 18.0, "avatar_status": "music-only (voiceover disabled)", "product_visual": "assets/product_images/fresh-hvn-default-can.png", "background_music": "assets/music/fresh-upbeat-loop.wav", "voiceover": "disabled"}
+{"timestamp": "2026-09-12T09:07:57+00:00", "event": "youtube_complete", "result": {"status": "uploaded", "video_id": "M6x0WjP82k0", "url": "https://www.youtube.com/shorts/M6x0WjP82k0"}}
+{"timestamp": "2026-09-12T09:08:46+00:00", "event": "instagram_complete", "result": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/DdLoNF-oAzG/", "raw_status": null, "request_id": "ee01523a-3678-40c2-af72-57c46878b312"}}
+{"timestamp": "2026-09-12T09:08:46+00:00", "event": "run_complete", "youtube": {"status": "uploaded", "video_id": "M6x0WjP82k0", "url": "https://www.youtube.com/shorts/M6x0WjP82k0"}, "instagram": {"status": "uploaded", "provider": "upload_post", "media_id": null, "url": "https://www.instagram.com/reel/DdLoNF-oAzG/", "raw_status": null, "request_id": "ee01523a-3678-40c2-af72-57c46878b312"}}
