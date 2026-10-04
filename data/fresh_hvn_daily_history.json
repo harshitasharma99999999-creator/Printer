@@ -1422,6 +1422,24 @@
         "url": null
       },
       "run_id": "20261003T101740Z"
+    },
+    {
+      "created_at": "2026-10-04T11:02:07+00:00",
+      "item_id": "fresh-hvn-fresh-pomegranate-juice",
+      "item_name": "Fresh Pomegranate Juice",
+      "title": "Fresh HVN Fresh Pomegranate Juice #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "p47YAmAG_k8",
+        "url": "https://www.youtube.com/shorts/p47YAmAG_k8"
+      },
+      "instagram": {
+        "status": "manual_required",
+        "reason": "Upload-Post Instagram auto-publish failed: RuntimeError: Upload-Post upload request failed with HTTP 429: {\"success\":false,\"message\":\"This upload (1 platforms) would exceed your monthly limit of 10 uploads. You have 0 upload(s) remaining this period. Paid plans have unlimited uploads: https://app.upload-post.com/pricing?plan=basic&interval=monthly&autostart=1\",\"usage\":{\"count\":10,\"limit\":10,\"last_reset\":\"2026-09-05T08:53:55.637154\"},\"error_code\":\"monthly_limit_reached\",\"upgrade_url\":\"https://app.upload-post.com/pricing?plan=basic&interval=monthly&autostart=1\"}\n",
+        "package": "/home/runner/work/Printer/Printer/output/20261004T110137Z-fresh-hvn-cloud/instagram-manual",
+        "url": null
+      },
+      "run_id": "20261004T110137Z"
     }
   ]
 }
