@@ -1600,6 +1600,26 @@
         "request_id": "ae39584b-9d1d-4e1d-9262-c2fde1c354fe"
       },
       "run_id": "20261012T125439Z"
+    },
+    {
+      "created_at": "2026-10-13T12:34:56+00:00",
+      "item_id": "fresh-hvn-fresh-pomegranate-juice",
+      "item_name": "Fresh Pomegranate Juice",
+      "title": "Fresh HVN Fresh Pomegranate Juice #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "W1QUAU6R5Hk",
+        "url": "https://www.youtube.com/shorts/W1QUAU6R5Hk"
+      },
+      "instagram": {
+        "status": "uploaded",
+        "provider": "upload_post",
+        "media_id": null,
+        "url": "https://www.instagram.com/reel/Deb0dBbgkzi/",
+        "raw_status": null,
+        "request_id": "90ac50fc-5ef6-47ea-8b33-64f6eb48204e"
+      },
+      "run_id": "20261013T123256Z"
     }
   ]
 }
