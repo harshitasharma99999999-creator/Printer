@@ -2020,6 +2020,26 @@
         "request_id": "43090ebf-724f-469f-b911-00f0aa24e15c"
       },
       "run_id": "20261104T125116Z"
+    },
+    {
+      "created_at": "2026-11-05T13:01:59+00:00",
+      "item_id": "fresh-hvn-fresh-watermelon-juice",
+      "item_name": "Fresh Watermelon Juice",
+      "title": "Fresh HVN Fresh Watermelon Juice #Shorts",
+      "youtube": {
+        "status": "uploaded",
+        "video_id": "L5PQDYo3Iso",
+        "url": "https://www.youtube.com/shorts/L5PQDYo3Iso"
+      },
+      "instagram": {
+        "status": "uploaded",
+        "provider": "upload_post",
+        "media_id": null,
+        "url": "https://www.instagram.com/reel/DfXFxxoACgA/",
+        "raw_status": null,
+        "request_id": "8bc3d35d-19b2-4a8b-8528-db836224a5ef"
+      },
+      "run_id": "20261105T125928Z"
     }
   ]
 }
